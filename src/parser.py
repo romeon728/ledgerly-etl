@@ -78,10 +78,11 @@ def parse_csv(file: Path) -> None:
     }
 
     # Determine account information
-    account_type = determine_account_info(raw_data)
+    account_type, last_four = determine_account_info(raw_data)
     parsed_data["account"] = {
       "bank": BANK,
-      "type": account_type
+      "type": account_type,
+      "last_four": last_four
     }    
 
     # Parse transactions
@@ -119,7 +120,7 @@ def determine_statement_period(raw_data:list) -> tuple[str,str]:
 
   return (first_date, last_date)
 
-def determine_account_info(raw_data:list) -> str:
+def determine_account_info(raw_data:list) -> tuple[str,str]:
   """
   Determine the account type and confirm bank account number matches
   """
@@ -146,6 +147,7 @@ def determine_account_info(raw_data:list) -> str:
     logging.error(f"More or less than one account number found in CSV. Script only supports 1 account type at a time: {account_number_list}")
     exit(1)
   account_number = account_number_list[0]
+  last_four = str(account_number)[-4:]
   account_type = ""
   if account_number == CHECKING_ACCOUNT_NUMBER:
     account_type = "Checking"
@@ -154,7 +156,7 @@ def determine_account_info(raw_data:list) -> str:
   else:
     logging.error(f"Unable to determine account type from account number found in CSV: {account_number}")
   
-  return account_type
+  return (account_type, last_four)
 
 def parse_transactions(raw_data:list) -> list:
   """
@@ -177,6 +179,7 @@ def parse_transactions(raw_data:list) -> list:
       "description": re.sub(r'\s+', ' ', description).strip(),
       "amount": amount,
       "category": None,
+      "subcategory": None,
       "merchant": None,
       "is_recurring": False
     }
