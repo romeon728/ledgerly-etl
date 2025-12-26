@@ -81,7 +81,8 @@ def parse_csv(file: Path) -> None:
     account_type = determine_account_info(raw_data)
     parsed_data["account"] = {
       "bank": BANK,
-      "type": account_type
+      "type": account_type,
+      "last_four": str(CHECKING_ACCOUNT_NUMBER)[-4:]
     }    
 
     # Parse transactions
