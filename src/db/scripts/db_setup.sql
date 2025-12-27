@@ -31,7 +31,7 @@ CREATE TABLE transactions (
 
 
 
--- Create rules table
+-- -- Create rules table
 -- CREATE TABLE rules (
 --   rule_id       SERIAL PRIMARY KEY,
 --   match_text    TEXT NOT NULL,
