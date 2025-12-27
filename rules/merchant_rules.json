@@ -6,6 +6,7 @@
     "merchant": "Venmo",
     "category": "Transfers",
     "subcategory": "Venmo Transfers",
+    "is_recurring": false,
     "flow_type": "inflow",
     "priority": 10,
     "active": true
@@ -17,6 +18,7 @@
     "merchant": "Venmo",
     "category": "Transfers",
     "subcategory": "Venmo Transfers",
+    "is_recurring": false,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -28,6 +30,7 @@
     "merchant": "Payroll",
     "category": "Income",
     "subcategory": null,
+    "is_recurring": true,
     "flow_type": "inflow",
     "priority": 10,
     "active": true
@@ -35,10 +38,11 @@
   {
     "id": 4,
     "match": "Online Xfer Transfer from SV x2766",
-    "match_type": "matches",
-    "merchant": "Savings Transfer (Online)",
+    "match_type": "equals",
+    "merchant": "TD Bank",
     "category": "Transfers",
     "subcategory": "Savings Transfers",
+    "is_recurring": false,
     "flow_type": "inflow",
     "priority": 10,
     "active": true
@@ -46,10 +50,11 @@
   {
     "id": 5,
     "match": "DEPOSIT TRANSFER From Savings x2766",
-    "match_type": "matches",
-    "merchant": "Savings Transfer (Deposit)",
+    "match_type": "equals",
+    "merchant": "TD Bank",
     "category": "Transfers",
     "subcategory": "Savings Transfers",
+    "is_recurring": false,
     "flow_type": "inflow",
     "priority": 10,
     "active": true
@@ -57,10 +62,11 @@
   {
     "id": 6,
     "match": "DISCOVER E-PAYMENT",
-    "match_type": "matches",
+    "match_type": "equals",
     "merchant": "Discover",
     "category": "Payments",
     "subcategory": "Credit Payments",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -72,6 +78,7 @@
     "merchant": "Capital One",
     "category": "Payments",
     "subcategory": "Credit Payments",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -83,6 +90,7 @@
     "merchant": "Best Buy",
     "category": "Payments",
     "subcategory": "Credit Payments",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -93,7 +101,8 @@
     "match_type": "contains",
     "merchant": "Firstmark",
     "category": "Payments",
-    "subcategory": "Loan Payments",
+    "subcategory": "Loan Payments (Education)",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -105,6 +114,7 @@
     "merchant": "PSEG",
     "category": "Utilities",
     "subcategory": "Electricity",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -115,7 +125,8 @@
     "match_type": "contains",
     "merchant": "Toyota",
     "category": "Payments",
-    "subcategory": "Loan Payments",
+    "subcategory": "Loan Payments (Truck)",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -127,6 +138,7 @@
     "merchant": "Spotify",
     "category": "Payments",
     "subcategory": "Subscriptions",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -138,6 +150,7 @@
     "merchant": "Verizon",
     "category": "Utilities",
     "subcategory": "Internet",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -149,6 +162,7 @@
     "merchant": "Zelle",
     "category": "Transfers",
     "subcategory": "Zelle Transfers",
+    "is_recurring": false,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -160,6 +174,7 @@
     "merchant": "Zelle",
     "category": "Transfers",
     "subcategory": "Zelle Transfers",
+    "is_recurring": false,
     "flow_type": "inflow",
     "priority": 10,
     "active": true
@@ -170,7 +185,8 @@
     "match_type": "contains",
     "merchant": "Nelnet",
     "category": "Payments",
-    "subcategory": "Loan Payments",
+    "subcategory": "Loan Payments (Education)",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -182,6 +198,7 @@
     "merchant": "Zelle",
     "category": "ATM",
     "subcategory": "Withdraw",
+    "is_recurring": false,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -193,6 +210,7 @@
     "merchant": "Withdraw",
     "category": "Withdraw",
     "subcategory": null,
+    "is_recurring": false,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -204,6 +222,7 @@
     "merchant": "Visa",
     "category": "Payments",
     "subcategory": "Visa Payments",
+    "is_recurring": false,
     "flow_type": "outflow",
     "priority": 5,
     "active": true
@@ -215,6 +234,7 @@
     "merchant": "GEICO",
     "category": "Insurance",
     "subcategory": "Car Insurance",
+    "is_recurring": true,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -226,6 +246,7 @@
     "merchant": "Uber",
     "category": "Transportation",
     "subcategory": null,
+    "is_recurring": false,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
@@ -237,17 +258,199 @@
     "merchant": "International",
     "category": "International",
     "subcategory": "International Payments",
+    "is_recurring": false,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
   },
   {
-    "id": 22,
+    "id": 23,
     "match": "INTL T XN FEE",
     "match_type": "contains",
     "merchant": "International",
     "category": "International",
     "subcategory": "International Transactions",
+    "is_recurring": false,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 24,
+    "match": "INTEREST CREDIT",
+    "match_type": "equals",
+    "merchant": "TD Bank",
+    "category": "Interest Credit",
+    "subcategory": null,
+    "is_recurring": true,
+    "flow_type": "inflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 25,
+    "match": "MAINTENANCE FEE",
+    "match_type": "equals",
+    "merchant": "TD Bank",
+    "category": "Maintenance Fee",
+    "subcategory": null,
+    "is_recurring": true,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 26,
+    "match": "Online Xfer Transfer to CK x4642",
+    "match_type": "equals",
+    "merchant": "TD Bank",
+    "category": "Transfers",
+    "subcategory": "Checking Transfers",
+    "is_recurring": false,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 27,
+    "match": "Online Xfer",
+    "match_type": "contains",
+    "merchant": "TD Bank",
+    "category": "Transfers",
+    "subcategory": "Other Transfers",
+    "is_recurring": false,
+    "flow_type": "outflow",
+    "priority": 5,
+    "active": true
+  },
+  {
+    "id": 28,
+    "match": "IRS",
+    "match_type": "contains",
+    "merchant": "IRS",
+    "category": "Tax Returns",
+    "subcategory": "Federal Tax Returns",
+    "is_recurring": false,
+    "flow_type": "inflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 29,
+    "match": "STATE OF N.J.",
+    "match_type": "contains",
+    "merchant": "IRS",
+    "category": "Tax Returns",
+    "subcategory": "N.J. Tax Returns",
+    "is_recurring": false,
+    "flow_type": "inflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 30,
+    "match": "MOBILE DEPOSIT",
+    "match_type": "equals",
+    "merchant": "TD Bank",
+    "category": "Deposit",
+    "subcategory": "Mobile Deposit",
+    "is_recurring": false,
+    "flow_type": "inflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 31,
+    "match": "BRIDGECREST",
+    "match_type": "contains",
+    "merchant": "Toyota",
+    "category": "Payments",
+    "subcategory": "Loan Payments (Car)",
+    "is_recurring": true,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 32,
+    "match": "ROWAN",
+    "match_type": "contains",
+    "merchant": "Rowan",
+    "category": "Education",
+    "subcategory": null,
+    "is_recurring": false,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 33,
+    "match": "INSURANCE RENTER",
+    "match_type": "contains",
+    "merchant": "GEICO",
+    "category": "Insurance",
+    "subcategory": "Renters insurance",
+    "is_recurring": false,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 34,
+    "match": "HAYNES RUN",
+    "match_type": "contains",
+    "merchant": "Haynes Run",
+    "category": "Housing",
+    "subcategory": "Rent",
+    "is_recurring": true,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 35,
+    "match": "ASSURANT",
+    "match_type": "contains",
+    "merchant": "GEICO",
+    "category": "Insurance",
+    "subcategory": "Renters insurance",
+    "is_recurring": true,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 36,
+    "match": "DEPOSIT",
+    "match_type": "equals",
+    "merchant": "TD Bank",
+    "category": "Deposit",
+    "subcategory": null,
+    "is_recurring": false,
+    "flow_type": "inflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 37,
+    "match": "CHECK #",
+    "match_type": "contains",
+    "merchant": "TD Bank",
+    "category": "Check",
+    "subcategory": null,
+    "is_recurring": false,
+    "flow_type": "outflow",
+    "priority": 10,
+    "active": true
+  },
+  {
+    "id": 38,
+    "match": "DEBIT TRANSFER To Checking x4642",
+    "match_type": "equals",
+    "merchant": "TD Bank",
+    "category": "Transfers",
+    "subcategory": "Checking Transfers",
+    "is_recurring": false,
     "flow_type": "outflow",
     "priority": 10,
     "active": true
