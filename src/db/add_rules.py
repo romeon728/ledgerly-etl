@@ -5,7 +5,7 @@ from psycopg2.extras import RealDictCursor
 import logging
 import json
 
-from database import LedgerlyDatabase
+from agents.database import LedgerlyDatabase
 
 DB = LedgerlyDatabase()
 RULES = {}

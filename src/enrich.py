@@ -109,6 +109,7 @@ def enrich_transactions():
   enriched_transactions = [enrich_transaction(tx) for tx in transactions]
 
   enriched_data = {
+    "import_info": TRANSACTIONS.get("import_info"),
     "statement_period": TRANSACTIONS.get("statement_period"),
     "account": TRANSACTIONS.get("account"),
     "transactions": enriched_transactions

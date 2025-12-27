@@ -52,6 +52,5 @@ transaction_id SERIAL PRIMARY KEY,
   category_source VARCHAR(20),
   rule_id INTEGER,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-  UNIQUE (date, description, amount)
+  sequence INTEGER DEFAULT 1
 );

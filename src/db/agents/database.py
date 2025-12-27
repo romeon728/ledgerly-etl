@@ -38,6 +38,11 @@ class LedgerlyDatabase:
 
       return None
   
+  def fetchone(self, query:str, params:tuple=None):
+    with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+      cur.execute(query, params)
+      return cur.fetchone()
+    
   def fetchall(self, query:str, params:tuple=None):
     with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
       cur.execute(query, params)

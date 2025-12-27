@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-import psycopg2
-from psycopg2.extras import RealDictCursor
 import logging
 import json
+from collections import Counter
 
-from database import LedgerlyDatabase
+from agents.database import LedgerlyDatabase
 
 DB = LedgerlyDatabase()
 TRANSACTIONS = {}
@@ -27,40 +26,84 @@ def load_transactions(path="data/enriched_transactions.json"):
   
   return 0
 
+def add_import():
+  """
+  Docstring for add_import
+  """ 
+
+  import_info = TRANSACTIONS["import_info"]
+  statement_period = TRANSACTIONS["statement_period"]
+  # Check if hash is already being stored in the database
+  if DB.fetchone(
+      query="SELECT 1 FROM imports WHERE file_hash = %s;",
+      params=(import_info["file_hash"],)
+    ):
+    logging.info("Duplicate File: This file has already been processed")
+    exit(1)
+
+  # Insert import, since hash does not exist in DB yet
+  DB.execute(
+    query="""
+      INSERT INTO imports (filename, file_hash, start_date, end_date, row_count)
+      VALUES (%s, %s, %s, %s, %s)
+    """,
+    params=(import_info["filename"], import_info["file_hash"], statement_period["start"], statement_period["end"], import_info["row_count"])
+  )
+
+  logging.info("New import successfully added to DB")
+
+  return 0
+
 def add_transactions():
 
   logging.info("Adding account information to database if does not exist")
   account_info = TRANSACTIONS['account']
   account_id = DB.execute(
-  query="""
-    INSERT INTO accounts (bank, account_type, account_number)
-    VALUES (%s, %s, %s)
-    ON CONFLICT (bank, account_type, account_number)
-    DO UPDATE SET bank = EXCLUDED.bank
-    RETURNING account_id;
-  """,
-  params=(account_info["bank"], account_info["type"], account_info["last_four"])
+    query="""
+      INSERT INTO accounts (bank, account_type, account_number)
+      VALUES (%s, %s, %s)
+      ON CONFLICT (bank, account_type, account_number)
+      DO UPDATE SET bank = EXCLUDED.bank
+      RETURNING account_id;
+    """,
+    params=(account_info["bank"], account_info["type"], account_info["last_four"])
   )
   logging.info(f"Account ID: {account_id}")
   
+  num_tx_added = 0
+  counts = Counter()
   for tx in TRANSACTIONS["transactions"]:
-    print(tx)
-    print(tx.values())
     tx_tuple = tuple([account_id] + list(tx.values()))
-    DB.execute(
-    query="""
-      INSERT INTO transactions (account_id, date, description, amount, merchant,
-        category, subcategory, is_recurring, flow_type, category_source, rule_id)
-      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-      ON CONFLICT DO NOTHING;
-    """,
-    params=tx_tuple
-    )
+    key = tx_tuple[:4]
+    counts[key] += 1
+    seq = counts[key]
+    key = tuple(list(key) + [seq])
+    tx_tuple = tuple(list(tx_tuple) + [seq])
 
-  logging.info("Committing changes and closing database")
-  DB.commit()
-  DB.close()
-  return
+    exists = DB.fetchone(
+      query="""
+        SELECT 1 FROM transactions 
+        WHERE account_id = %s AND date = %s AND description = %s AND amount = %s AND sequence = %s
+      """,
+      params=key
+    )
+    
+    if not exists:
+      DB.execute(
+        query="""
+          INSERT INTO transactions (account_id, date, description, amount, merchant,
+            category, subcategory, is_recurring, flow_type, category_source, rule_id, sequence)
+          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        params=tx_tuple
+      )
+      num_tx_added += 1
+    else:
+      logging.warning(f"Skipping Duplicate Row: {tx_tuple[:4]}")
+  
+  logging.info(f"{num_tx_added} transactions added to DB")
+
+  return 0
 
 # ----------------------------------------------------------------
 # Main execution
@@ -69,6 +112,16 @@ if __name__ == "__main__":
   # Configure logging
   logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+  # Connect to Database
   DB.connect()
+
+  # Load Transactions
   load_transactions()
+
+  # Add the import and transactions to DB
+  add_import()
   add_transactions()
+
+  logging.info("Committing changes and closing database")
+  DB.commit()
+  DB.close()
