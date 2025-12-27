@@ -178,9 +178,9 @@ def parse_transactions(raw_data:list) -> list:
       "date": date,
       "description": re.sub(r'\s+', ' ', description).strip(),
       "amount": amount,
+      "merchant": None,
       "category": None,
       "subcategory": None,
-      "merchant": None,
       "is_recurring": False
     }
     transactions.append(transaction)

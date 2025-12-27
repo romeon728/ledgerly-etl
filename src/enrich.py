@@ -19,9 +19,13 @@ def load_rules(path="rules/merchant_rules.json"):
   with open(path, "r") as f:
     rules = json.load(f)
   
-  rules.sort(key=lambda r: r.get("priority", 10), reverse=True)
   logging.info(f"{len(rules)} Rules Loaded")
-  
+  if len(rules) != rules[-1]['id']:
+    logging.error("Last ID does not match number of rules in merchange_rules.json; Exiting...")
+    exit(1)
+
+  rules.sort(key=lambda r: r.get("priority", 10), reverse=True)
+
   global RULES
   RULES = rules
   
@@ -73,6 +77,7 @@ def enrich_transaction(tx:dict):
       tx["merchant"] = rule.get("merchant")
       tx["category"] = rule.get("category")
       tx["subcategory"] = rule.get("subcategory") or rule.get("category")
+      tx["is_recurring"] = rule.get("is_recurring")
       tx["flow_type"] = rule.get("flow_type") or ("inflow" if tx["amount"] > 0 else "outflow")
       tx["category_source"] = "rule"
       tx["rule_id"] = rule.get("id")
@@ -87,9 +92,11 @@ def enrich_transaction(tx:dict):
       return tx
 
   # No rule matched
+  logging.warning(f"Unknown Description: {description}")
   tx["merchant"] = tx.get("merchant") or "Unknown"
   tx["category"] = tx.get("category") or "Uncategorized"
   tx["subcategory"] = tx.get("subcategory") or tx["category"]
+  tx["is_recurring"] = tx.get("is_recurring")
   tx["flow_type"] = "inflow" if tx["amount"] > 0 else "outflow"
   tx["category_source"] = "unmatched"
   tx["rule_id"] = None
