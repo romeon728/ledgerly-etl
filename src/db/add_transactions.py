@@ -18,8 +18,8 @@ def load_transactions(path="data/enriched_transactions.json"):
   
   
   logging.info(f"{len(transactions['transactions'])} Transactions Loaded")
-  logging.info(f"Statement Period: {transactions['statement_period']['start']} -> {transactions['statement_period']['end']}")
-  logging.info(f"Account Information: {transactions['account']['bank']} | {transactions['account']['type']} x{transactions['account']['last_four']}")
+  logging.info(f"\tStatement Period: {transactions['statement_period']['start']} -> {transactions['statement_period']['end']}")
+  logging.info(f"\tAccount Information: {transactions['account']['bank']} | {transactions['account']['type']} x{transactions['account']['last_four']}")
   
   global TRANSACTIONS
   TRANSACTIONS = transactions
@@ -42,19 +42,20 @@ def add_import():
     exit(1)
 
   # Insert import, since hash does not exist in DB yet
-  DB.execute(
+  import_id = DB.execute(
     query="""
       INSERT INTO imports (filename, file_hash, start_date, end_date, row_count)
       VALUES (%s, %s, %s, %s, %s)
+      RETURNING import_id;
     """,
     params=(import_info["filename"], import_info["file_hash"], statement_period["start"], statement_period["end"], import_info["row_count"])
   )
 
   logging.info("New import successfully added to DB")
 
-  return 0
+  return import_id
 
-def add_transactions():
+def add_transactions(import_id:int):
 
   logging.info("Adding account information to database if does not exist")
   account_info = TRANSACTIONS['account']
@@ -73,33 +74,38 @@ def add_transactions():
   num_tx_added = 0
   counts = Counter()
   for tx in TRANSACTIONS["transactions"]:
-    tx_tuple = tuple([account_id] + list(tx.values()))
-    key = tx_tuple[:4]
+    if not isinstance(tx, dict):
+      logging.error(f"Transaction is not expected dictionary: {tx}")
+      exit(1)
+
+    key = (tx.get("date"), tx.get("description"), tx.get("amount"), tx.get("merchant"), tx.get("category"))
     counts[key] += 1
     seq = counts[key]
-    key = tuple(list(key) + [seq])
-    tx_tuple = tuple(list(tx_tuple) + [seq])
+
 
     exists = DB.fetchone(
       query="""
         SELECT 1 FROM transactions 
-        WHERE account_id = %s AND date = %s AND description = %s AND amount = %s AND sequence = %s
+        WHERE account_id = %s AND rule_id = %s AND date = %s AND description = %s AND amount = %s AND sequence = %s
       """,
-      params=key
+      params=(account_id, tx.get("rule_id"), tx.get("date"), tx.get("description"), tx.get("amount"), seq)
     )
     
     if not exists:
       DB.execute(
         query="""
-          INSERT INTO transactions (account_id, date, description, amount, merchant,
-            category, subcategory, is_recurring, flow_type, category_source, rule_id, sequence)
+          INSERT INTO transactions (account_id, import_id, rule_id, date, description, amount, 
+            merchant, category, subcategory, is_recurring, flow_type, sequence)
           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
-        params=tx_tuple
+        params=(
+          account_id, import_id, tx.get("rule_id"), tx.get("date"), tx.get("description"), tx.get("amount"), tx.get("merchant"), 
+          tx.get("category"), tx.get("subcategory"), tx.get("is_recurring"), tx.get("flow_type"), seq 
+        )
       )
       num_tx_added += 1
     else:
-      logging.warning(f"Skipping Duplicate Row: {tx_tuple[:4]}")
+      logging.warning(f"Skipping Duplicate Row: {key}")
   
   logging.info(f"{num_tx_added} transactions added to DB")
 
@@ -119,8 +125,8 @@ if __name__ == "__main__":
   load_transactions()
 
   # Add the import and transactions to DB
-  add_import()
-  add_transactions()
+  import_id = add_import()
+  add_transactions(import_id)
 
   logging.info("Committing changes and closing database")
   DB.commit()
