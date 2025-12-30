@@ -38,10 +38,16 @@ class LedgerlyDatabase:
 
       return None
   
+  def fetchone(self, query:str, params:tuple=None):
+    with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
+      cur.execute(query, params)
+      res = cur.fetchone()
+      return dict(res) if res else None    
+    
   def fetchall(self, query:str, params:tuple=None):
     with self.conn.cursor(cursor_factory=RealDictCursor) as cur:
       cur.execute(query, params)
-      return cur.fetchall()
+      return [dict(row) for row in cur.fetchall()]
 
   def commit(self):
     self.conn.commit()

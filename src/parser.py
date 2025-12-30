@@ -10,6 +10,7 @@ import os
 from dotenv import load_dotenv
 import json
 import re
+import hashlib
 
 """
 parseCSV.py:
@@ -61,14 +62,26 @@ def parse_csv(file: Path) -> None:
   """
   
   logging.info("Parsing CSV: %s", file)
+
+  # Get the Hash (Binary Mode "rb")
+  with open(file, "rb") as f:
+    file_bytes = f.read()
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
   
   # Parse the CSV file and write to dictionary
   parsed_data = {}
   with file.open("r", newline="", encoding="utf-8") as f:
     reader = csv.reader(f)
-    header = next(reader) # Skip header
+    next(reader) # Skip header
 
     raw_data = [tuple(row) for row in reader]
+
+    # Add import information
+    parsed_data["import_info"] = {
+      "filename": str(file),
+      "file_hash": file_hash,
+      "row_count": len(raw_data)
+    }
     
     # Determine statement period
     statement_start, statement_end = determine_statement_period(raw_data)
@@ -110,15 +123,12 @@ def determine_statement_period(raw_data:list) -> tuple[str,str]:
   transaction_dates = [row[0] for row in raw_data]
   sorted_dates = sorted(transaction_dates, key=lambda d: datetime.strptime(d, "%Y-%m-%d"))
   
-  ds = date.fromisoformat(sorted_dates[0])
-  de = date.fromisoformat(sorted_dates[-1])
+  start_date = sorted_dates[0]
+  end_date = sorted_dates[-1]
 
-  first_date = date(ds.year, ds.month, 1).isoformat()
-  last_date = date(de.year, de.month, 
-    calendar.monthrange(de.year, de.month)[1]
-  ).isoformat()
+  logging.info(f"Start/End dates of transactions: {start_date} -> {end_date}")
 
-  return (first_date, last_date)
+  return (start_date, end_date)
 
 def determine_account_info(raw_data:list) -> tuple[str,str]:
   """
