@@ -1,6 +1,7 @@
 import logging
 from collections import deque
 import streamlit as st
+import os
 
 # 1. The Shared Buffer
 # We keep this as a global variable in this module so app.py can read it
@@ -11,11 +12,12 @@ class StreamlitLogHandler(logging.Handler):
     msg = self.format(record)
     log_buffer.append(msg)
 
+@st.cache_resource
 def setup_logging():
-  root_logger = logging.getLogger()
+  root_logger = logging.getLogger("ledgerly")
   root_logger.setLevel(logging.INFO)
 
-  if not root_logger.handlers:
+  if not any(isinstance(h, StreamlitLogHandler) for h in root_logger.handlers):
     # Console Handler
     console_handler = logging.StreamHandler()
     # Adding filename to console as well
@@ -25,8 +27,10 @@ def setup_logging():
     st_handler = StreamlitLogHandler()
     # Clean, professional format for your UI
     # Example: 2025-01-01 12:00:00 | INFO | parser.py:42 | Starting parse...
-    st_formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(filename)s:%(lineno)d | %(message)s', datefmt='%H:%M:%S')
+    st_formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(module)s | %(lineno)d | %(message)s', datefmt='%H:%M:%S')
     st_handler.setFormatter(st_formatter)
     
     root_logger.addHandler(console_handler)
     root_logger.addHandler(st_handler)
+
+  return log_buffer # Return the buffer so app.py can access it

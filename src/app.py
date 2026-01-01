@@ -4,11 +4,10 @@ from datetime import date
 import json
 
 import logging
-from logger_config import setup_logging, log_buffer
+from logger_config import setup_logging
 
-# Initialize logging immediately
-setup_logging()
-logger = logging.getLogger(__name__)
+log_buffer = setup_logging()
+logger = logging.getLogger("ledgerly")
 
 import parser
 import enrich
@@ -32,6 +31,11 @@ def get_backend():
 
 if "startup_done" not in st.session_state:
   # --- EVERYTHING IN THIS BLOCK RUNS ONLY ONCE ---  
+
+  # --- PROCESS & UPLOAD TAB
+  st.session_state.transactions_loaded = False
+
+  # --- RULES TAB
   st.session_state.rules_data = [
     {"match_text": "", "match_type": "equals", "pattern": "", "category": "", "subcategory": "", "is_recurring": False, "priority": 10}
   ]
@@ -60,7 +64,7 @@ with tab_process:
     st.subheader("1. Input")
     uploaded_file = st.file_uploader("Upload Bank CSV", type=["csv"])
     
-    if uploaded_file:
+    if uploaded_file and not st.session_state.transactions_loaded:
       # This triggers your parsing pipeline automatically
       parsed_data = parser.parse_csv(uploaded_file)
       enriched_data = enrich.enrich_parsed_transactions(parsed_data)
@@ -69,10 +73,12 @@ with tab_process:
       enriched_transactions_df['date'] = pd.to_datetime(enriched_transactions_df['date']).dt.date
       
       st.success(f"Parsed {len(enriched_transactions_df)} transactions")
+      st.session_state.transactions_loaded = True
       
       if st.button("🚀 Upload to Database", type="primary"):
         # logic.upload(df_enriched)
         st.toast("Transactions uploaded successfully!", icon="✅")
+        st.session_state.transactions_loaded = False
 
   with col2:
     st.subheader("2. Review")
@@ -219,6 +225,7 @@ with tab_logs:
   with col1:
     if st.button(label="", icon="🗑️", help="Clear Logs"):
       log_buffer.clear()
+      logger.info("🧹 Logs cleared by user")
       st.rerun()
   with col2:
     if st.button(label="", icon="🔍", help="Filter"):

@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
 import logging
-logger = logging.getLogger(__name__)
+from logger_config import setup_logging
+
+log_buffer = setup_logging()
+logger = logging.getLogger("ledgerly")
 
 import argparse
 from pathlib import Path
