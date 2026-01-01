@@ -14,7 +14,7 @@ from db.agents.database import LedgerlyDatabase
 class AccountTransactions():
 
   def __init__(self):
-    logger.info("MerchangeRules (Class): Initialized")
+    logger.info("AccountTransactions (Class): Initialized")
 
   # --------------------------------------------------
   # STREAMLIT PIPELINE FUNCTIONS

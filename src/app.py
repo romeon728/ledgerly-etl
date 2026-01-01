@@ -17,24 +17,18 @@ from db.transactions import AccountTransactions
 @st.cache_resource
 def get_backend():
   db = LedgerlyDatabase()
-  db.connect() # Establish connection once
-
   mr = MerchantRules()
-  mr.load_rules(db)
-
   at = AccountTransactions()
-
   return db, mr, at
 
 if "startup_done" not in st.session_state:
-  """
-  EVERYTHING IN THIS BLOCK RUNS ONLY ONCE
-  """
-
+  # EVERYTHING IN THIS BLOCK RUNS ONLY ONCE
+  
   # --- PROCESS & UPLOAD TAB
   st.session_state.transactions_loaded = False
 
   # --- RULES TAB
+  st.session_state.rules_loaded = False
   st.session_state.rules_data = [
     {"match_text": "", "match_type": "equals", "pattern": "", "category": "", "subcategory": "", "is_recurring": False, "priority": 10}
   ]
@@ -70,6 +64,7 @@ with tab_process:
         parsed_data = parser.parse_csv(uploaded_file)
         enriched_data = enrich.enrich_parsed_transactions(parsed_data)
         at.process_transactions_df(enriched_data)
+        st.toast("Transactions Loaded", icon="✅")
       
         st.success(f"Parsed {len(at.enriched_transactions_df)} transactions")
         st.session_state.transactions_loaded = True
@@ -132,6 +127,7 @@ with tab_rules:
       if st.button("🏁 Confirm Updates", type="secondary"):
         st.info("Saving to database...")
         st.session_state.rules_update_table_disabled = True
+        st.session_state.rules_loaded = False
         st.session_state.rules_add_button_disabled = False
         st.session_state.rules_update_button_disabled = False
         st.rerun()
@@ -143,6 +139,7 @@ with tab_rules:
       if st.button("👍 Add New Rule(s)", type="secondary"):
         st.info("Saving to database...")
         st.session_state.rules_add_section_disabled = True
+        st.session_state.rules_loaded = False
         st.session_state.rules_add_button_disabled = False
         st.session_state.rules_update_button_disabled = False
         st.rerun()
@@ -197,10 +194,15 @@ with tab_rules:
       )
 
   # List rules
-  _, mr, _ = get_backend()
-  merchant_rules_df = pd.DataFrame(mr.rules)
+  # Only load rules on start or when rules are updated
+  db, mr, _ = get_backend()
+  if not st.session_state.rules_loaded:
+    mr.load_rules(db)
+    st.toast("Rules Loaded", icon="✅")
+    st.session_state.rules_loaded = True
+
   merchant_rules_de = st.data_editor(
-    merchant_rules_df,
+    pd.DataFrame(mr.rules),
     column_config={
       "rule_id": None,
       "created_at": None,
