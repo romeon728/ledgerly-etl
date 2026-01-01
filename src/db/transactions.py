@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-
+import pandas as pd
 from collections import Counter
+from datetime import date
 
 import logging
 from logger_config import setup_logging
@@ -19,6 +20,10 @@ class AccountTransactions():
   # STREAMLIT PIPELINE FUNCTIONS
   # --------------------------------------------------
 
+  def process_transactions_df(self, enriched_transactions) -> pd.DataFrame:
+    self.enriched_transactions_df = pd.DataFrame(list(enriched_transactions["transactions"]))
+    self.enriched_transactions_df['date'] = pd.to_datetime(self.enriched_transactions_df['date']).dt.date
+    return self.enriched_transactions_df
 
   # --------------------------------------------------
   # CONSOLE PIPELINE FUNCTIONS

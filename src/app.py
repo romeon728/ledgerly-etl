@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
-import json
 
 import logging
 from logger_config import setup_logging
@@ -21,16 +19,17 @@ def get_backend():
   db = LedgerlyDatabase()
   db.connect() # Establish connection once
 
-  merchant_rules = MerchantRules()
-  merchant_rules.load_rules(db)
+  mr = MerchantRules()
+  mr.load_rules(db)
 
-  account_transactions = AccountTransactions()
+  at = AccountTransactions()
 
-
-  return db, merchant_rules, account_transactions
+  return db, mr, at
 
 if "startup_done" not in st.session_state:
-  # --- EVERYTHING IN THIS BLOCK RUNS ONLY ONCE ---  
+  """
+  EVERYTHING IN THIS BLOCK RUNS ONLY ONCE
+  """
 
   # --- PROCESS & UPLOAD TAB
   st.session_state.transactions_loaded = False
@@ -64,28 +63,32 @@ with tab_process:
     st.subheader("1. Input")
     uploaded_file = st.file_uploader("Upload Bank CSV", type=["csv"])
     
-    if uploaded_file and not st.session_state.transactions_loaded:
+    if uploaded_file:
       # This triggers your parsing pipeline automatically
-      parsed_data = parser.parse_csv(uploaded_file)
-      enriched_data = enrich.enrich_parsed_transactions(parsed_data)
+      if not st.session_state.transactions_loaded:
+        _, _, at = get_backend()
+        parsed_data = parser.parse_csv(uploaded_file)
+        enriched_data = enrich.enrich_parsed_transactions(parsed_data)
+        at.process_transactions_df(enriched_data)
       
-      enriched_transactions_df = pd.DataFrame(list(enriched_data["transactions"]))
-      enriched_transactions_df['date'] = pd.to_datetime(enriched_transactions_df['date']).dt.date
-      
-      st.success(f"Parsed {len(enriched_transactions_df)} transactions")
-      st.session_state.transactions_loaded = True
+        st.success(f"Parsed {len(at.enriched_transactions_df)} transactions")
+        st.session_state.transactions_loaded = True
       
       if st.button("🚀 Upload to Database", type="primary"):
         # logic.upload(df_enriched)
         st.toast("Transactions uploaded successfully!", icon="✅")
         st.session_state.transactions_loaded = False
+    
+    else:
+      st.session_state.transactions_loaded = False
 
   with col2:
     st.subheader("2. Review")
     st.caption("💡 Unrecognized transactions can be configured within the **⚙️ Rules Engine**.")
+    _, _, at = get_backend()
     if uploaded_file:
       st.data_editor(
-        enriched_transactions_df,
+        at.enriched_transactions_df,
         column_config={
           "date": st.column_config.DateColumn("Transaction Date",format="MMM DD, YYYY",help="The date the transaction cleared the bank"),
           "description": st.column_config.TextColumn("Description",help="Description of the transaction"),
@@ -165,9 +168,10 @@ with tab_rules:
 
   # List unkown transactions
   if uploaded_file:
-    needs_rules_df = enriched_transactions_df[
-      (enriched_transactions_df["merchant"] == "Unknown") & 
-      (enriched_transactions_df["category"] == "Uncategorized")
+    _, _, at = get_backend()
+    needs_rules_df = at.enriched_transactions_df[
+      (at.enriched_transactions_df["merchant"] == "Unknown") & 
+      (at.enriched_transactions_df["category"] == "Uncategorized")
     ]
     needs_rules_df = needs_rules_df.reset_index(drop=True)
     if needs_rules_df.empty:
@@ -193,8 +197,8 @@ with tab_rules:
       )
 
   # List rules
-  _, merchant_rules, _ = get_backend()
-  merchant_rules_df = pd.DataFrame(merchant_rules.rules)
+  _, mr, _ = get_backend()
+  merchant_rules_df = pd.DataFrame(mr.rules)
   merchant_rules_de = st.data_editor(
     merchant_rules_df,
     column_config={
@@ -212,7 +216,7 @@ with tab_rules:
     },
     num_rows="dynamic",
     width='stretch',
-    height=250,
+    height=350,
     disabled=st.session_state.rules_update_table_disabled
   )
 
