@@ -8,29 +8,51 @@ import os
 log_buffer = deque(maxlen=100)
 
 class StreamlitLogHandler(logging.Handler):
+
+  def __init__(self):
+    super().__init__()
+    # Internal list to store raw messages or formatted strings
+    self.captured_logs = {"All": []}
+
   def emit(self, record):
     msg = self.format(record)
+    self.capture_log_dict(msg)
     log_buffer.append(msg)
+  
+  def capture_log_dict(self, msg):
+    log_module = str(msg).split(' | ')[2].capitalize()
+    if log_module not in self.captured_logs.keys():
+      self.captured_logs[log_module] = []
+    self.captured_logs["All"].append(msg)
+    self.captured_logs[log_module].append(msg)
+    
+  def get_logs(self, module="All"):
+    """Returns the captured logs as a standard list."""
+    return self.captured_logs[module]
+
+  def get_modules(self):
+    """Returns the modules in the captured logs"""
+    return list(self.captured_logs.keys())
+  
+  def clear_history(self):
+    """Wipes the internal list and the global buffer."""
+    self.captured_logs.clear()
+    self.captured_logs = {"All": []}
+    log_buffer.clear()
 
 @st.cache_resource
 def setup_logging():
-  root_logger = logging.getLogger("ledgerly")
-  root_logger.setLevel(logging.INFO)
+    root_logger = logging.getLogger("ledgerly")
+    root_logger.setLevel(logging.INFO)
 
-  if not any(isinstance(h, StreamlitLogHandler) for h in root_logger.handlers):
-    # Console Handler
-    console_handler = logging.StreamHandler()
-    # Adding filename to console as well
-    console_handler.setFormatter(logging.Formatter('[%(filename)s] %(message)s'))
+    # Check if our specific handler already exists
+    existing_handler = next((h for h in root_logger.handlers if isinstance(h, StreamlitLogHandler)), None)
     
-    # Streamlit Handler
-    st_handler = StreamlitLogHandler()
-    # Clean, professional format for your UI
-    # Example: 2025-01-01 12:00:00 | INFO | parser.py:42 | Starting parse...
-    st_formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(module)s | %(lineno)d | %(message)s', datefmt='%H:%M:%S')
-    st_handler.setFormatter(st_formatter)
+    if not existing_handler:
+        st_handler = StreamlitLogHandler()
+        st_formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(module)s | %(message)s', datefmt='%H:%M:%S')
+        st_handler.setFormatter(st_formatter)
+        root_logger.addHandler(st_handler)
+        return st_handler
     
-    root_logger.addHandler(console_handler)
-    root_logger.addHandler(st_handler)
-
-  return log_buffer # Return the buffer so app.py can access it
+    return existing_handler

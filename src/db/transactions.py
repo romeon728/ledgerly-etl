@@ -25,6 +25,13 @@ class AccountTransactions():
     self.enriched_transactions_df['date'] = pd.to_datetime(self.enriched_transactions_df['date']).dt.date
     return self.enriched_transactions_df
 
+  def process_unknown_transactions_df(self):
+    self.unknown_transactions_df = self.enriched_transactions_df[
+      (self.enriched_transactions_df["merchant"] == "Unknown") & 
+      (self.enriched_transactions_df["category"] == "Uncategorized")
+    ]
+    self.unknown_transactions_df = self.unknown_transactions_df.reset_index(drop=True)
+    return self.unknown_transactions_df
   # --------------------------------------------------
   # CONSOLE PIPELINE FUNCTIONS
   # --------------------------------------------------

@@ -1,10 +1,13 @@
+##### TODO
+##### If unknown merchants found, show warning (yellow banner) below 2. Review with revised tip to look at Rules Engine
+
 import streamlit as st
 import pandas as pd
 
 import logging
 from logger_config import setup_logging
 
-log_buffer = setup_logging()
+log_handler = setup_logging()
 logger = logging.getLogger("ledgerly")
 
 import parser
@@ -31,13 +34,16 @@ if "startup_done" not in st.session_state:
   # --- RULES TAB
   st.session_state.rules_loaded = False
   st.session_state.rules_data = [
-    {"match_text": "", "match_type": "equals", "pattern": "", "category": "", "subcategory": "", "is_recurring": False, "priority": 10}
+    {"match_text": "", "match_type": "equals", "merchant": "", "category": "", "subcategory": "", "is_recurring": False, "priority": 10}
   ]
   st.session_state.rules_update_table_disabled = True
   st.session_state.rules_update_button_disabled = False
   st.session_state.rules_add_button_disabled = False
 
   st.session_state.rules_add_section_disabled= True
+
+  # --- LOGS TAB
+  st.session_state.filtered_module = None
   
   # Set the flag to True so this block is skipped on the next rerun
   st.session_state.startup_done = True
@@ -71,25 +77,38 @@ with tab_process:
         parsed_data = parser.parse_csv(uploaded_file)
         enriched_data = enrich.enrich_parsed_transactions(parsed_data)
         at.process_transactions_df(enriched_data)
+        at.process_unknown_transactions_df()
         st.toast("Transactions Loaded", icon="✅")
-      
         st.success(f"Parsed {len(at.enriched_transactions_df)} transactions")
         st.session_state.transactions_loaded = True
       
-      if st.button("🚀 Upload to Database", type="primary"):
-        # logic.upload(df_enriched)
-        st.session_state.transactions_loaded = False
-        st.session_state.file_uploader_n += 1
-        st.session_state.upload_success = True
-        st.rerun()
+      if st.session_state.get("confirm_phase"):
+        col1_1, col1_2 = st.columns(2)
+        if col1_1.button("✅ Confirm", use_container_width=True, type="primary"):
+          # logic.upload(df_enriched)
+          st.session_state.confirm_phase = False
+          st.session_state.transactions_loaded = False
+          st.session_state.file_uploader_n += 1
+          st.session_state.upload_success = True
+          st.rerun()
+        if col1_2.button("❌ Cancel", use_container_width=True):
+          st.session_state.confirm_phase = False
+          st.rerun()
+      
+      else:
+        if st.button("🚀 Upload to Database", type="primary"):
+          st.session_state.confirm_phase = True
+          st.rerun()
     
     else:
       st.session_state.transactions_loaded = False
 
   with col2:
     st.subheader("2. Review")
-    st.caption("💡 Unrecognized transactions can be configured within the **⚙️ Rules Engine**.")
     _, _, at = get_backend()
+    if st.session_state.transactions_loaded and not at.unknown_transactions_df.empty:
+      st.warning(f"{len(at.unknown_transactions_df)} Unknown Transactions found.")
+    st.caption("💡 Unrecognized transactions can be configured within the **⚙️ Rules Engine**.")
     if uploaded_file:
       st.data_editor(
         at.enriched_transactions_df,
@@ -117,7 +136,7 @@ with tab_rules:
   st.subheader("Rules Engine")
 
   # Buttons for Adding and Updating rules
-  col1, col2 = st.columns([1, 6])
+  col1, col2 = st.columns([1, 12])
   with col1:
     if st.button("➕ Add", type="primary", disabled=st.session_state.rules_add_button_disabled):
       st.session_state.rules_add_section_disabled = False
@@ -175,16 +194,11 @@ with tab_rules:
   # List unkown transactions
   if uploaded_file:
     _, _, at = get_backend()
-    needs_rules_df = at.enriched_transactions_df[
-      (at.enriched_transactions_df["merchant"] == "Unknown") & 
-      (at.enriched_transactions_df["category"] == "Uncategorized")
-    ]
-    needs_rules_df = needs_rules_df.reset_index(drop=True)
-    if needs_rules_df.empty:
+    if at.unknown_transactions_df.empty:
       st.info("**All transactions are categorized!** There are no 'Unknown' merchants or 'Uncategorized' transactions to review.", icon="✨")
     else:
       st.data_editor(
-        needs_rules_df,
+        at.unknown_transactions_df,
         column_config={
           "date": st.column_config.DateColumn("Transaction Date",format="MMM DD, YYYY",help="The date the transaction cleared the bank"),
           "description": st.column_config.TextColumn("Description",help="Description of the transaction"),
@@ -235,21 +249,32 @@ with tab_rules:
 with tab_logs:
   st.subheader("System Logs")
   
-  # Optional: Filter or Clear buttons
   col1, col2 = st.columns([1, 20])
   with col1:
     if st.button(label="", icon="🗑️", help="Clear Logs"):
-      log_buffer.clear()
+      log_handler.clear_history()
       st.session_state.logs_cleared = True
+      st.session_state.filtered_module = None
       st.rerun()
   with col2:
-    if st.button(label="", icon="🔍", help="Filter"):
-      logger.info(f"<TEST> LOG OUTPUT")
-      st.rerun()
+    default_ix = log_handler.get_modules().index("All")
+    log_module_selection = st.selectbox(
+      label="Filter Logs",
+      options=log_handler.get_modules(),
+      index=default_ix,
+      help="Select a module to filter logs",
+      label_visibility="collapsed" # Removes the top label for a 'search bar' feel
+  )
+    # if log_module_selection:
+    #   logs_list = log_handler.get_logs(log_module_selection)
+    #   st.session_state.filtered_module = log_module_selection
+    #   logger.info(log_module_selection)
+    #   logger.info(st.session_state.filtered_module)
+    #   st.rerun()
 
   # Join the deque of logs into one block of text
   # We convert to a list first because deques are specialized objects
-  log_text = "\n".join(list(log_buffer))
+  log_text = "\n".join(log_handler.get_logs(log_module_selection))
 
   if log_text:
     # 'python' or 'bash' language provides nice coloring for timestamps/tags
