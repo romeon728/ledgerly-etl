@@ -151,7 +151,10 @@ with tab_rules:
       st.session_state.rules_update_button_disabled = True
       st.rerun()
 
-    if not st.session_state.rules_update_table_disabled:
+  if not st.session_state.rules_update_table_disabled:
+    st.divider()
+    col2_1, col2_2 = st.columns([1, 6])
+    with col2_1:
       if st.button("🏁 Confirm Updates", type="secondary"):
         st.info("Saving to database...")
         st.session_state.rules_update_table_disabled = True
@@ -159,6 +162,8 @@ with tab_rules:
         st.session_state.rules_add_button_disabled = False
         st.session_state.rules_update_button_disabled = False
         st.rerun()
+    with col2_2:
+      st.caption("💡 You can't delete rules, but you can de-activate them by unchecking **Active**.")
   
   if not st.session_state.rules_add_section_disabled:
     st.divider()
@@ -245,6 +250,31 @@ with tab_rules:
     disabled=st.session_state.rules_update_table_disabled
   )
 
+
+# --- TAB 3: DASHBOARD ---
+with tab_dashboard:
+  st.subheader("Dashboard")
+  grafana_url = "http://localhost:3000/d/adl5rnw/ledgerly?orgId=1&from=now-1y&to=now&timezone=browser&var-bank=TD%20Bank"
+  grafana_msg = "View Ledgerly Grafana Report"
+  st.markdown(
+    """
+    <style>
+    .custom-link {
+      text-decoration: none;
+      color: #ff4b4b; /* Streamlit Red */
+      font-weight: 500;
+    }
+    .custom-link:hover {
+      text-decoration: underline;
+    }
+    </style>
+    <a class="custom-link" href="http://localhost:3000/d/adl5rnw/ledgerly?orgId=1&from=now-1y&to=now&timezone=browser&var-bank=TD%20Bank" target="_blank">
+      View Ledgerly Grafana Report
+    </a>
+    """, 
+    unsafe_allow_html=True
+  )
+
 # --- TAB 4: LOGS ---
 with tab_logs:
   st.subheader("System Logs")
@@ -265,13 +295,7 @@ with tab_logs:
       help="Select a module to filter logs",
       label_visibility="collapsed" # Removes the top label for a 'search bar' feel
   )
-    # if log_module_selection:
-    #   logs_list = log_handler.get_logs(log_module_selection)
-    #   st.session_state.filtered_module = log_module_selection
-    #   logger.info(log_module_selection)
-    #   logger.info(st.session_state.filtered_module)
-    #   st.rerun()
-
+    
   # Join the deque of logs into one block of text
   # We convert to a list first because deques are specialized objects
   log_text = "\n".join(log_handler.get_logs(log_module_selection))

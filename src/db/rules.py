@@ -31,7 +31,7 @@ class MerchantRules():
     db.connect()
 
     self.rules = db.fetchall(
-      query="SELECT * FROM rules ORDER BY priority DESC;"
+      query="SELECT * FROM rules ORDER BY priority DESC, active;"
     )
     logger.info(f"{len(self.rules)} Rules Loaded")
     
