@@ -25,6 +25,7 @@ if "startup_done" not in st.session_state:
   # EVERYTHING IN THIS BLOCK RUNS ONLY ONCE
   
   # --- PROCESS & UPLOAD TAB
+  st.session_state.file_uploader_n = 0
   st.session_state.transactions_loaded = False
 
   # --- RULES TAB
@@ -43,6 +44,12 @@ if "startup_done" not in st.session_state:
 
   st.toast("Backend Connected", icon="✅")
 
+if st.session_state.get("upload_success"):
+  st.toast("Transactions uploaded successfully!", icon="✅")
+  del st.session_state.upload_success
+if st.session_state.get("logs_cleared"):
+  st.toast("Logs cleared by user", icon="🧹")
+  del st.session_state.logs_cleared
 
 # Page Config: Makes it wide-screen and gives it a title icon
 st.set_page_config(page_title="Ledgerly", page_icon="💸", layout="wide")
@@ -55,7 +62,7 @@ with tab_process:
   
   with col1:
     st.subheader("1. Input")
-    uploaded_file = st.file_uploader("Upload Bank CSV", type=["csv"])
+    uploaded_file = st.file_uploader("Upload Bank CSV", type=["csv"], key=f"uploader_{st.session_state.file_uploader_n}")
     
     if uploaded_file:
       # This triggers your parsing pipeline automatically
@@ -71,8 +78,10 @@ with tab_process:
       
       if st.button("🚀 Upload to Database", type="primary"):
         # logic.upload(df_enriched)
-        st.toast("Transactions uploaded successfully!", icon="✅")
         st.session_state.transactions_loaded = False
+        st.session_state.file_uploader_n += 1
+        st.session_state.upload_success = True
+        st.rerun()
     
     else:
       st.session_state.transactions_loaded = False
@@ -231,7 +240,7 @@ with tab_logs:
   with col1:
     if st.button(label="", icon="🗑️", help="Clear Logs"):
       log_buffer.clear()
-      logger.info("🧹 Logs cleared by user")
+      st.session_state.logs_cleared = True
       st.rerun()
   with col2:
     if st.button(label="", icon="🔍", help="Filter"):
