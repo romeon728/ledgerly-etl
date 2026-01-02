@@ -2,7 +2,12 @@
 
 import psycopg2
 from psycopg2.extras import RealDictCursor
+
 import logging
+from logger_config import setup_logging
+
+log_buffer = setup_logging()
+logger = logging.getLogger("ledgerly")
 
 class LedgerlyDatabase:
 
@@ -10,11 +15,8 @@ class LedgerlyDatabase:
   USER = "nromeo"
   
   def __init__(self):
-    # Configure logging
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
     self.conn = None
-    logging.info("Ledgerly Database (Class): Initialized")
+    logger.info("Ledgerly Database (Class): Initialized")
 
   def connect(self):
     try:
@@ -25,8 +27,8 @@ class LedgerlyDatabase:
           host=""
         )
     except Exception as err:
-      logging.error(f"Failed to Connect to Legderly Database: {err}")
-    logging.info("Ledgerly Database: Connected")
+      logger.error(f"Failed to Connect to Legderly Database: {err}")
+    logger.info("Ledgerly Database: Connected")
   
   def execute(self, query:str, params:tuple=None):
     with self.conn.cursor() as cur:
@@ -51,10 +53,10 @@ class LedgerlyDatabase:
 
   def commit(self):
     self.conn.commit()
-    logging.info("Ledgerly Database (Changes): Committed")
+    logger.info("Ledgerly Database (Changes): Committed")
 
   def close(self):
     if self.conn:
       self.conn.close()
       self.conn = None
-    logging.info("Ledgerly Database: Closed")
+    logger.info("Ledgerly Database: Closed")

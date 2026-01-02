@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 
-import argparse
 import logging
+from logger_config import setup_logging
+
+log_buffer = setup_logging()
+logger = logging.getLogger("ledgerly")
+
+import argparse
 from pathlib import Path
 import csv
-from datetime import datetime, date
-import calendar
+from datetime import datetime
 import os
 from dotenv import load_dotenv
-import json
 import re
 import hashlib
+import io
 
 """
 parseCSV.py:
@@ -37,6 +41,58 @@ BANK_RTN = ""
 CHECKING_ACCOUNT_NUMBER = ""
 SAVINGS_ACCOUNT_NUMBER = ""
 
+
+def parse_csv(uploaded_file) -> dict:
+  """
+  parse the given statement CSV and load it into a JSON for further processing
+
+  date, bank_rtn, account_number, _, description, debit, credit, _, _ = row 
+    - Exclude [Transaction Type, Check Number, Account Running Balance]
+
+  """
+  
+  set_env()
+
+  filename = uploaded_file.name
+  logger.info("Parsing CSV: %s", filename)
+
+  # Get the Hash (Binary Mode "rb")
+  file_bytes = uploaded_file.getvalue()
+  file_hash = hashlib.sha256(file_bytes).hexdigest()  
+
+  # Parse the CSV file and write to dictionary
+  string_data = file_bytes.decode("utf-8")
+  reader = csv.reader(io.StringIO(string_data))
+  next(reader) # Skip header
+
+  raw_data = [tuple(row) for row in reader]
+
+  # Build the data structure
+  statement_start, statement_end = determine_statement_period(raw_data)
+  account_type, last_four = determine_account_info(raw_data)
+  parsed_data = {
+    "import_info": {
+      "filename": filename,
+      "file_hash": file_hash,
+      "row_count": len(raw_data)
+    },
+    "statement_period": {
+      "start": statement_start,
+      "end": statement_end
+    },
+    "account": {
+      "bank": BANK,
+      "type": account_type,
+      "last_four": last_four
+    },
+    "transactions": parse_transactions(raw_data)
+  }
+  
+  logger.info(f"Parsed {len(raw_data)} rows from {filename}")
+  return parsed_data
+
+# HELPER FUNCTIONS 
+
 def set_env():
   """
   Loads the information needed from your .env file
@@ -50,70 +106,7 @@ def set_env():
   CHECKING_ACCOUNT_NUMBER = os.getenv("CHECKING_ACCOUNT_NUMBER")
   SAVINGS_ACCOUNT_NUMBER = os.getenv("SAVINGS_ACCOUNT_NUMBER")
 
-  logging.info(f".env Config Information:\n\t- Bank: {BANK}\n\t- RTN: {BANK_RTN}\n\t- Checking Account: {CHECKING_ACCOUNT_NUMBER}\n\t- Savings Account: {SAVINGS_ACCOUNT_NUMBER}")
-
-def parse_csv(file: Path) -> None:
-  """
-  parse the given statement CSV and load it into a JSON for further processing
-
-  date, bank_rtn, account_number, _, description, debit, credit, _, _ = row 
-    - Exclude [Transaction Type, Check Number, Account Running Balance]
-
-  """
-  
-  logging.info("Parsing CSV: %s", file)
-
-  # Get the Hash (Binary Mode "rb")
-  with open(file, "rb") as f:
-    file_bytes = f.read()
-    file_hash = hashlib.sha256(file_bytes).hexdigest()
-  
-  # Parse the CSV file and write to dictionary
-  parsed_data = {}
-  with file.open("r", newline="", encoding="utf-8") as f:
-    reader = csv.reader(f)
-    next(reader) # Skip header
-
-    raw_data = [tuple(row) for row in reader]
-
-    # Add import information
-    parsed_data["import_info"] = {
-      "filename": str(file),
-      "file_hash": file_hash,
-      "row_count": len(raw_data)
-    }
-    
-    # Determine statement period
-    statement_start, statement_end = determine_statement_period(raw_data)
-    parsed_data["statement_period"] = {
-      "start": statement_start,
-      "end": statement_end
-    }
-
-    # Determine account information
-    account_type, last_four = determine_account_info(raw_data)
-    parsed_data["account"] = {
-      "bank": BANK,
-      "type": account_type,
-      "last_four": last_four
-    }    
-
-    # Parse transactions
-    parsed_data["transactions"] = parse_transactions(raw_data)
-  
-
-  # Save parsed data to JSON
-  file_path = "./data/transaction_data.json"
-  logging.info(f"Dumping parsed data into JSON: {file_path}")
-
-  directory = os.path.dirname(file_path)
-  if not os.path.exists(directory):
-    os.makedirs(directory)
-
-  with open(file_path, 'w') as json_file:
-    json.dump(parsed_data, json_file, indent=4)
-
-  return 0
+  logger.info(f".env Config Information:\n\t- Bank: {BANK}\n\t- RTN: {BANK_RTN}\n\t- Checking Account: {CHECKING_ACCOUNT_NUMBER}\n\t- Savings Account: {SAVINGS_ACCOUNT_NUMBER}")
 
 def determine_statement_period(raw_data:list) -> tuple[str,str]:
   """
@@ -126,7 +119,7 @@ def determine_statement_period(raw_data:list) -> tuple[str,str]:
   start_date = sorted_dates[0]
   end_date = sorted_dates[-1]
 
-  logging.info(f"Start/End dates of transactions: {start_date} -> {end_date}")
+  logger.info(f"Start/End dates of transactions: {start_date} -> {end_date}")
 
   return (start_date, end_date)
 
@@ -145,16 +138,16 @@ def determine_account_info(raw_data:list) -> tuple[str,str]:
   
   bank_rtn_list = get_unique_list(raw_data, 1)
   if len(bank_rtn_list) != 1:
-    logging.error(f"More or less than one RTN found in CSV: {bank_rtn_list}")
+    logger.error(f"More or less than one RTN found in CSV: {bank_rtn_list}")
     exit(1)
   bank_rtn = bank_rtn_list[0]
   if bank_rtn != BANK_RTN:
-    logging.error(f"Bank RTN found in data does not match RTN on file: {bank_rtn}")
+    logger.error(f"Bank RTN found in data does not match RTN on file: {bank_rtn}")
     exit(1)
 
   account_number_list = get_unique_list(raw_data, 2)
   if len(account_number_list) != 1:
-    logging.error(f"More or less than one account number found in CSV. Script only supports 1 account type at a time: {account_number_list}")
+    logger.error(f"More or less than one account number found in CSV. Script only supports 1 account type at a time: {account_number_list}")
     exit(1)
   account_number = account_number_list[0]
   last_four = str(account_number)[-4:]
@@ -164,7 +157,7 @@ def determine_account_info(raw_data:list) -> tuple[str,str]:
   elif account_number == SAVINGS_ACCOUNT_NUMBER:
     account_type = "Savings"
   else:
-    logging.error(f"Unable to determine account type from account number found in CSV: {account_number}")
+    logger.error(f"Unable to determine account type from account number found in CSV: {account_number}")
   
   return (account_type, last_four)
 
@@ -181,7 +174,7 @@ def parse_transactions(raw_data:list) -> list:
     elif credit == "" or credit is None:
       amount = float(debit) * -1
     else:
-      logging.warning(f"Both debit and credit amounts empty for transaction (Date: {date}, Description: {description}); Skipping transaction")
+      logger.warning(f"Both debit and credit amounts empty for transaction (Date: {date}, Description: {description}); Skipping transaction")
       continue
     
     transaction = {
@@ -195,27 +188,25 @@ def parse_transactions(raw_data:list) -> list:
     }
     transactions.append(transaction)
 
-  logging.info(f"Number of transactions collected: {len(transactions)}")
+  logger.info(f"Number of transactions collected: {len(transactions)}")
   return sorted(transactions, key=lambda x: datetime.strptime(x["date"], "%Y-%m-%d"))
 
 
 # ----------------------------------------------------------------
 # Main execution
 # ----------------------------------------------------------------
-if __name__ == "__main__":
+def main():
   # Set up argument parser
   parser = argparse.ArgumentParser(description="Parse the given CSV file and Account Type")
   parser.add_argument("--file", type=Path, help="Path to the input CSV file")
   args = parser.parse_args()
 
   # Check if input file exists and is type CSV
-  if not args.file.exists() or args.file.suffix.lower() != ".csv":
-    logging.error("Input file does not exist or is not a CSV file: %s", args.file)
-    exit(1)
+  if isinstance(args.file, Path):
+    if not args.file.exists() or args.file.suffix.lower() != ".csv":
+      logger.error("Input file does not exist or is not a CSV file: %s", args.file)
+      exit(1)
   
-  # Configure logging
-  logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
   # Set environment variables
   set_env()
 
