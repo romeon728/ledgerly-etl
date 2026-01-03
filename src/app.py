@@ -10,9 +10,6 @@ from logger_config import setup_logging
 log_handler = setup_logging()
 logger = logging.getLogger("ledgerly")
 
-import parser
-import enrich
-
 from db.agents.database import LedgerlyDatabase
 from db.imports import ImportManager
 from db.rules import RulesEngine
@@ -37,14 +34,13 @@ if "startup_done" not in st.session_state:
 
   # --- RULES TAB
   st.session_state.rules_loaded = False
-  st.session_state.rules_data = [
-    {"match_text": "", "match_type": "equals", "merchant": "", "category": "", "subcategory": "", "is_recurring": False, "priority": 10}
-  ]
   st.session_state.rules_update_table_disabled = True
   st.session_state.rules_update_button_disabled = False
   st.session_state.rules_add_button_disabled = False
-
   st.session_state.rules_add_section_disabled= True
+
+  # --- IMPORTS TAB
+  st.session_state.imports_loaded = False
 
   # --- LOGS TAB
   st.session_state.filtered_module = None
@@ -52,6 +48,12 @@ if "startup_done" not in st.session_state:
   # Set the flag to True so this block is skipped on the next rerun
   st.session_state.startup_done = True
   st.toast("Backend Connected", icon="✅")
+
+if "current_imports_df" not in st.session_state:
+  db, im, _, _ = get_backend()
+  im.get_imports(db)
+  df = im.current_imports_df.copy()
+  st.session_state.current_imports_df = df
 
 # --- TOASTS ---
 if st.session_state.get("upload_success"):
@@ -68,8 +70,11 @@ if st.session_state.get("logs_cleared"):
   st.toast("Logs cleared by user", icon="🧹")
   del st.session_state.logs_cleared
 if st.session_state.get("show_import_error"):
-  st.toast("**Import Error:** The uploaded CSV already exists in Database.", icon="🚨")
+  st.toast("**Import Error:** The uploaded CSV already exists in Database.", icon="💀")
   del st.session_state.show_import_error
+if st.session_state.get("import_delete_success"):
+  st.toast("Selected imports successfully deleted.", icon="✅")
+  del st.session_state.import_delete_success
 
 # Page Config: Makes it wide-screen and gives it a title icon
 st.set_page_config(page_title="Ledgerly", page_icon="💸", layout="wide")
@@ -110,6 +115,7 @@ with tab_process:
           st.session_state.transactions_loaded = False
           st.session_state.file_uploader_n += 1
           st.session_state.upload_success = True
+          del st.session_state.current_imports_df
           st.rerun()
         if col1_2.button("👎 Cancel", use_container_width=True):
           st.session_state.confirm_phase = False
@@ -199,7 +205,7 @@ with tab_rules:
 
     with col1_2:
       edited_rules = st.data_editor(
-        st.session_state["rules_data"],
+        [{"match_text": "", "match_type": "equals", "merchant": "", "category": "", "subcategory": "", "is_recurring": False, "priority": 10}],
         column_config={
           "match_text": st.column_config.TextColumn("Description Text", required=True, help="How the rule matches the transaction"),
           "match_type": st.column_config.SelectboxColumn("Match Type", options=["equals", "contains"], required=True, help="How the rule matches the transaction"),
@@ -297,6 +303,37 @@ with tab_dashboard:
 # --- TAB 4: IMPORTS ---
 with tab_imports:
   st.subheader("Imports Manager")
+  db, im, _, _ = get_backend()
+  current_imports_de = st.data_editor(
+    st.session_state.current_imports_df,
+    column_config={
+      "is_selected": st.column_config.CheckboxColumn("Selected",help="Toggle to be deleted upon selection"),
+      "bank": st.column_config.TextColumn("Bank",help="The bank holding the transactions"),
+      "filename": st.column_config.TextColumn("File Name",help="The filename of the imported CSV"),
+      "start_date": st.column_config.DateColumn("Start Date",help="The start date of the transactions",format="YYYY-MM-DD"),
+      "end_date": st.column_config.DateColumn("End Date",help="The end date of the transactions",format="YYYY-MM-DD"),
+      "row_count": st.column_config.TextColumn("Num Transactions",help="The number of transactions within the CSV"),
+      "account_type": st.column_config.TextColumn("Account Type",help="The account type (Checking, Savings, Credit, etc.)"),
+      "account_number": st.column_config.TextColumn("Account Number (Last 4)",help="The account number (x####)"),
+    },
+    num_rows="dynamic",
+    width='stretch',
+    height=250,
+    disabled=[
+      c for c in st.session_state.current_imports_df.columns
+      if c != "is_selected"
+    ],
+    key="imports_data_editor"
+  )
+  if st.button("🗑️ Delete Selected Imports", type="primary"):
+    selected_data = current_imports_de[current_imports_de["is_selected"]]    
+    if selected_data.empty:
+      st.error("No rows selected!")
+    else:
+      im.delete_imports(db, selected_data)
+      st.session_state.import_delete_success = True
+      del st.session_state.current_imports_df
+      st.rerun()
 
 # --- TAB 5: LOGS ---
 with tab_logs:
