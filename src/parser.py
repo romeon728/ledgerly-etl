@@ -106,7 +106,7 @@ def set_env():
   CHECKING_ACCOUNT_NUMBER = os.getenv("CHECKING_ACCOUNT_NUMBER")
   SAVINGS_ACCOUNT_NUMBER = os.getenv("SAVINGS_ACCOUNT_NUMBER")
 
-  logger.info(f".env Config Information:\n\t- Bank: {BANK}\n\t- RTN: {BANK_RTN}\n\t- Checking Account: {CHECKING_ACCOUNT_NUMBER}\n\t- Savings Account: {SAVINGS_ACCOUNT_NUMBER}")
+  logger.info(f".env Config Information:\n\t- Bank: {BANK}\n\t- RTN: x{BANK_RTN[-4:]}\n\t- Checking Account: x{CHECKING_ACCOUNT_NUMBER[-4:]}\n\t- Savings Account: x{SAVINGS_ACCOUNT_NUMBER[-4:]}")
 
 def determine_statement_period(raw_data:list) -> tuple[str,str]:
   """

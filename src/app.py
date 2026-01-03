@@ -14,22 +14,26 @@ import parser
 import enrich
 
 from db.agents.database import LedgerlyDatabase
-from db.rules import MerchantRules
+from db.imports import ImportManager
+from db.rules import RulesEngine
 from db.transactions import AccountTransactions
 
 @st.cache_resource
 def get_backend():
   db = LedgerlyDatabase()
-  mr = MerchantRules()
+  im = ImportManager()
+  re = RulesEngine()
   at = AccountTransactions()
-  return db, mr, at
+  return db, im, re, at
 
+# --- STARTUP ---
 if "startup_done" not in st.session_state:
   # EVERYTHING IN THIS BLOCK RUNS ONLY ONCE
   
   # --- PROCESS & UPLOAD TAB
   st.session_state.file_uploader_n = 0
   st.session_state.transactions_loaded = False
+  st.session_state.import_id = 0
 
   # --- RULES TAB
   st.session_state.rules_loaded = False
@@ -47,20 +51,30 @@ if "startup_done" not in st.session_state:
   
   # Set the flag to True so this block is skipped on the next rerun
   st.session_state.startup_done = True
-
   st.toast("Backend Connected", icon="✅")
 
+# --- TOASTS ---
 if st.session_state.get("upload_success"):
-  st.toast("Transactions uploaded successfully!", icon="✅")
+  _, _, _, at = get_backend()
+  if at.num_tx_added == len(at.enriched_transactions_df):
+    st.toast("All transactions uploaded successfully!", icon="✅")
+  elif at.num_tx_added == 0:
+    st.toast("No transactions were uploaded successfully.", icon="🚨")
+  else:
+    st.toast(f"{at.num_tx_added}/{len(at.enriched_transactions_df)} transactions uploaded successfully!", icon="✅")
+    st.toast(f"{len(at.enriched_transactions_df) - at.num_tx_added} transactions skipped due to duplication.", icon="⚠️")
   del st.session_state.upload_success
 if st.session_state.get("logs_cleared"):
   st.toast("Logs cleared by user", icon="🧹")
   del st.session_state.logs_cleared
+if st.session_state.get("show_import_error"):
+  st.toast("**Import Error:** The uploaded CSV already exists in Database.", icon="🚨")
+  del st.session_state.show_import_error
 
 # Page Config: Makes it wide-screen and gives it a title icon
 st.set_page_config(page_title="Ledgerly", page_icon="💸", layout="wide")
 st.title("💸 Ledgerly")
-tab_process, tab_rules, tab_dashboard, tab_logs = st.tabs(["📤 Process & Upload", "⚙️ Rules Engine", "📊 Dashboard", "📜 Logs"])
+tab_process, tab_rules, tab_dashboard, tab_imports, tab_logs = st.tabs(["📤 Process & Upload", "⚙️ Rules Engine", "📊 Dashboard", "📂 Imports", "📜 Logs"])
 
 # --- TAB 1: UPLOAD & ENRICH ---
 with tab_process:
@@ -73,25 +87,31 @@ with tab_process:
     if uploaded_file:
       # This triggers your parsing pipeline automatically
       if not st.session_state.transactions_loaded:
-        _, _, at = get_backend()
-        parsed_data = parser.parse_csv(uploaded_file)
-        enriched_data = enrich.enrich_parsed_transactions(parsed_data)
-        at.process_transactions_df(enriched_data)
-        at.process_unknown_transactions_df()
+        _, _, re, at = get_backend()
+        at.process_transactions(uploaded_file, re)
         st.toast("Transactions Loaded", icon="✅")
         st.success(f"Parsed {len(at.enriched_transactions_df)} transactions")
         st.session_state.transactions_loaded = True
       
       if st.session_state.get("confirm_phase"):
+        st.write("🤔 Have you reviewed your transaction?")
         col1_1, col1_2 = st.columns(2)
-        if col1_1.button("✅ Confirm", use_container_width=True, type="primary"):
-          # logic.upload(df_enriched)
+        if col1_1.button("👍 Confirm", use_container_width=True, type="primary"):
+          db, im, _, at = get_backend()
+          st.session_state.import_id = im.add_import(db, at.enriched_transactions)
+          if st.session_state.import_id == 0:
+            st.session_state.show_import_error = True
+            st.rerun()
+
+          # If no import error, upload to DB
+          result = at.add_transactions(db, st.session_state.import_id)
+
           st.session_state.confirm_phase = False
           st.session_state.transactions_loaded = False
           st.session_state.file_uploader_n += 1
           st.session_state.upload_success = True
           st.rerun()
-        if col1_2.button("❌ Cancel", use_container_width=True):
+        if col1_2.button("👎 Cancel", use_container_width=True):
           st.session_state.confirm_phase = False
           st.rerun()
       
@@ -105,7 +125,7 @@ with tab_process:
 
   with col2:
     st.subheader("2. Review")
-    _, _, at = get_backend()
+    _, _, _, at = get_backend()
     if st.session_state.transactions_loaded and not at.unknown_transactions_df.empty:
       st.warning(f"{len(at.unknown_transactions_df)} Unknown Transactions found.")
     st.caption("💡 Unrecognized transactions can be configured within the **⚙️ Rules Engine**.")
@@ -198,7 +218,7 @@ with tab_rules:
 
   # List unkown transactions
   if uploaded_file:
-    _, _, at = get_backend()
+    _, _, _, at = get_backend()
     if at.unknown_transactions_df.empty:
       st.info("**All transactions are categorized!** There are no 'Unknown' merchants or 'Uncategorized' transactions to review.", icon="✨")
     else:
@@ -223,14 +243,14 @@ with tab_rules:
 
   # List rules
   # Only load rules on start or when rules are updated
-  db, mr, _ = get_backend()
+  db, _, re, _ = get_backend()
   if not st.session_state.rules_loaded:
-    mr.load_rules(db)
+    re.load_rules(db)
     st.toast("Rules Loaded", icon="✅")
     st.session_state.rules_loaded = True
 
   merchant_rules_de = st.data_editor(
-    pd.DataFrame(mr.rules),
+    pd.DataFrame(re.rules),
     column_config={
       "rule_id": None,
       "created_at": None,
@@ -249,7 +269,6 @@ with tab_rules:
     height=350,
     disabled=st.session_state.rules_update_table_disabled
   )
-
 
 # --- TAB 3: DASHBOARD ---
 with tab_dashboard:
@@ -275,7 +294,11 @@ with tab_dashboard:
     unsafe_allow_html=True
   )
 
-# --- TAB 4: LOGS ---
+# --- TAB 4: IMPORTS ---
+with tab_imports:
+  st.subheader("Imports Manager")
+
+# --- TAB 5: LOGS ---
 with tab_logs:
   st.subheader("System Logs")
   

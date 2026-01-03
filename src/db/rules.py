@@ -10,7 +10,7 @@ logger = logging.getLogger("ledgerly")
 
 from db.agents.database import LedgerlyDatabase
 
-class MerchantRules():
+class RulesEngine():
 
   def __init__(self):
     logger.info("MerchangeRules (Class): Initialized")
