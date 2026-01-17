@@ -4,6 +4,7 @@ from logger_config import setup_logging
 log_buffer = setup_logging()
 logger = logging.getLogger("ledgerly")
 
+from db.agents.database import LedgerlyDatabase
 from db.rules import RulesEngine
 
 """
@@ -25,7 +26,7 @@ def enrich_transaction(num_matches:int, tx:dict, re:RulesEngine):
   
   def matches(rule:dict, description:str):
     desc = description.upper()
-    pattern = str(rule.get("match")).upper()
+    pattern = str(rule.get("match_text")).upper()
 
     if rule.get("match_type") == "contains" or rule.get("match_type") == "equals":
       if pattern in desc or pattern == desc: 
@@ -35,7 +36,7 @@ def enrich_transaction(num_matches:int, tx:dict, re:RulesEngine):
     return False
 
   description = tx.get("description")
-  for rule in re.json_rules:
+  for rule in re.rules:
     # Skip inactive rules
     if not rule.get("active", True):
       continue
@@ -49,7 +50,7 @@ def enrich_transaction(num_matches:int, tx:dict, re:RulesEngine):
       tx["subcategory"] = rule.get("subcategory") or rule.get("category")
       tx["is_recurring"] = rule.get("is_recurring")
       tx["flow_type"] = "inflow" if tx["amount"] > 0 else "outflow"
-      tx["rule_id"] = rule.get("id")
+      tx["rule_id"] = rule.get("rule_id")
 
       return (NUM_MATCHES, tx)
     
@@ -60,9 +61,9 @@ def enrich_transaction(num_matches:int, tx:dict, re:RulesEngine):
   exit(1)
 
 
-def enrich_parsed_transactions(parsed_transactions:dict, re:RulesEngine) -> dict:
+def enrich_parsed_transactions(parsed_transactions:dict, db:LedgerlyDatabase, re:RulesEngine) -> dict:
   # Load merchant rules and account transactions
-  re.load_json_rules()
+  re.load_rules(db)
 
   logger.info("Starting transaction enrichment...")
   logger.info(f"{len(parsed_transactions['transactions'])} Transactions Loaded")
@@ -87,11 +88,3 @@ def enrich_parsed_transactions(parsed_transactions:dict, re:RulesEngine) -> dict
   logger.info("Finished transaction enrichment.")
 
   return enriched_data
-
-
-# ----------------------------------------------------------------
-# Main execution
-# ----------------------------------------------------------------
-def main():  
-  # Enrich transactions
-  enrich_parsed_transactions()

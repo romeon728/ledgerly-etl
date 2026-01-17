@@ -64,6 +64,7 @@ class ImportManager():
     imports_to_del_list = list(imports_to_del.itertuples(index=False, name=None))
     for i in imports_to_del_list:
       params = tuple(list(i)[1:])
+      logger.debug(f"Import Params for File Hash (fetchone): {params}")
 
       file_hash = db.fetchone(
         query="""

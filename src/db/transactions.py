@@ -23,10 +23,10 @@ class AccountTransactions():
   # STREAMLIT PIPELINE FUNCTIONS
   # --------------------------------------------------
 
-  def process_transactions(self, uploaded_file, re:RulesEngine) -> pd.DataFrame:
+  def process_transactions(self, uploaded_file, db:LedgerlyDatabase, re:RulesEngine):
     # Parse and enrich transactions
     self.parsed_transactions = parser.parse_csv(uploaded_file)
-    self.enriched_transactions = enrich.enrich_parsed_transactions(self.parsed_transactions, re)
+    self.enriched_transactions = enrich.enrich_parsed_transactions(self.parsed_transactions, db, re)
 
     # Convert transactions into DataFrame
     self.enriched_transactions_df = pd.DataFrame(list(self.enriched_transactions["transactions"]))

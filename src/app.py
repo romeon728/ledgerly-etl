@@ -1,8 +1,6 @@
-##### TODO
-##### If unknown merchants found, show warning (yellow banner) below 2. Review with revised tip to look at Rules Engine
-
 import streamlit as st
 import pandas as pd
+from pathlib import Path
 
 import logging
 from logger_config import setup_logging
@@ -17,11 +15,17 @@ from db.transactions import AccountTransactions
 
 @st.cache_resource
 def get_backend():
+  """
+  Loads modules during startup or rerun: 
+    db, im, re, at
+  """
   db = LedgerlyDatabase()
   im = ImportManager()
   re = RulesEngine()
   at = AccountTransactions()
   return db, im, re, at
+
+db, im, re, at = get_backend()
 
 # --- STARTUP ---
 if "startup_done" not in st.session_state:
@@ -38,6 +42,7 @@ if "startup_done" not in st.session_state:
   st.session_state.rules_update_button_disabled = False
   st.session_state.rules_add_button_disabled = False
   st.session_state.rules_add_section_disabled= True
+  st.session_state.rules_add_help_captions = False
 
   # --- IMPORTS TAB
   st.session_state.imports_loaded = False
@@ -50,14 +55,12 @@ if "startup_done" not in st.session_state:
   st.toast("Backend Connected", icon="✅")
 
 if "current_imports_df" not in st.session_state:
-  db, im, _, _ = get_backend()
   im.get_imports(db)
-  df = im.current_imports_df.copy()
-  st.session_state.current_imports_df = df
+  st.session_state.current_imports_df = im.current_imports_df.copy()
 
 # --- TOASTS ---
+# > Process & Upload Toasts
 if st.session_state.get("upload_success"):
-  _, _, _, at = get_backend()
   if at.num_tx_added == len(at.enriched_transactions_df):
     st.toast("All transactions uploaded successfully!", icon="✅")
   elif at.num_tx_added == 0:
@@ -66,20 +69,31 @@ if st.session_state.get("upload_success"):
     st.toast(f"{at.num_tx_added}/{len(at.enriched_transactions_df)} transactions uploaded successfully!", icon="✅")
     st.toast(f"{len(at.enriched_transactions_df) - at.num_tx_added} transactions skipped due to duplication.", icon="⚠️")
   del st.session_state.upload_success
-if st.session_state.get("logs_cleared"):
-  st.toast("Logs cleared by user", icon="🧹")
-  del st.session_state.logs_cleared
 if st.session_state.get("show_import_error"):
   st.toast("**Import Error:** The uploaded CSV already exists in Database.", icon="💀")
   del st.session_state.show_import_error
 if st.session_state.get("import_delete_success"):
   st.toast("Selected imports successfully deleted.", icon="✅")
   del st.session_state.import_delete_success
+# > Rules Toasts
+if st.session_state.get("rules_added_success"):
+  st.toast("New rules successfully added.", icon="✅")
+  del st.session_state.rules_added_success
+if st.session_state.get("matched_descriptions_rules_warning"):
+  st.toast(f"WARNING: Skipped {len(re.matched_descriptions_rules)} new descriptions matched already existing rules.", icon="🚨")
+  del st.session_state.matched_descriptions_rules_warning
+if st.session_state.get("already_exists_rules_warning"):
+  st.toast(f"WARNING: Skipped {len(re.already_exists_rules)} new drules matched already existing rules.", icon="🚨")
+  del st.session_state.already_exists_rules_warning
+# > Logs Toasts
+if st.session_state.get("logs_cleared"):
+  st.toast("Logs cleared by user", icon="🧹")
+  del st.session_state.logs_cleared
 
 # Page Config: Makes it wide-screen and gives it a title icon
 st.set_page_config(page_title="Ledgerly", page_icon="💸", layout="wide")
 st.title("💸 Ledgerly")
-tab_process, tab_rules, tab_dashboard, tab_imports, tab_logs = st.tabs(["📤 Process & Upload", "⚙️ Rules Engine", "📊 Dashboard", "📂 Imports", "📜 Logs"])
+tab_process, tab_rules, tab_dashboard, tab_imports, tab_logs, tab_about = st.tabs(["📤 Process & Upload", "⚙️ Rules Engine", "📊 Dashboard", "📂 Imports", "📜 Logs", "💡 About"])
 
 # --- TAB 1: UPLOAD & ENRICH ---
 with tab_process:
@@ -92,8 +106,7 @@ with tab_process:
     if uploaded_file:
       # This triggers your parsing pipeline automatically
       if not st.session_state.transactions_loaded:
-        _, _, re, at = get_backend()
-        at.process_transactions(uploaded_file, re)
+        at.process_transactions(uploaded_file, db, re)
         st.toast("Transactions Loaded", icon="✅")
         st.success(f"Parsed {len(at.enriched_transactions_df)} transactions")
         st.session_state.transactions_loaded = True
@@ -102,7 +115,6 @@ with tab_process:
         st.write("🤔 Have you reviewed your transaction?")
         col1_1, col1_2 = st.columns(2)
         if col1_1.button("👍 Confirm", use_container_width=True, type="primary"):
-          db, im, _, at = get_backend()
           st.session_state.import_id = im.add_import(db, at.enriched_transactions)
           if st.session_state.import_id == 0:
             st.session_state.show_import_error = True
@@ -131,7 +143,6 @@ with tab_process:
 
   with col2:
     st.subheader("2. Review")
-    _, _, _, at = get_backend()
     if st.session_state.transactions_loaded and not at.unknown_transactions_df.empty:
       st.warning(f"{len(at.unknown_transactions_df)} Unknown Transactions found.")
     st.caption("💡 Unrecognized transactions can be configured within the **⚙️ Rules Engine**.")
@@ -162,7 +173,7 @@ with tab_rules:
   st.subheader("Rules Engine")
 
   # Buttons for Adding and Updating rules
-  col1, col2 = st.columns([1, 12])
+  col1, col2 = st.columns([1, 10])
   with col1:
     if st.button("➕ Add", type="primary", disabled=st.session_state.rules_add_button_disabled):
       st.session_state.rules_add_section_disabled = False
@@ -194,37 +205,97 @@ with tab_rules:
   if not st.session_state.rules_add_section_disabled:
     st.divider()
     col1_1, col1_2 = st.columns([1, 6])
-    with col1_1:
-      if st.button("👍 Add New Rule(s)", type="secondary"):
-        st.info("Saving to database...")
-        st.session_state.rules_add_section_disabled = True
-        st.session_state.rules_loaded = False
-        st.session_state.rules_add_button_disabled = False
-        st.session_state.rules_update_button_disabled = False
-        st.rerun()
-
+    
+    added_rules_base_dict = {"match_text": "", "match_type": "equals", "merchant": "", "category": "", "subcategory": "", "is_recurring": False, "priority": 10}
     with col1_2:
-      edited_rules = st.data_editor(
-        [{"match_text": "", "match_type": "equals", "merchant": "", "category": "", "subcategory": "", "is_recurring": False, "priority": 10}],
+
+      if st.session_state.rules_add_help_captions:
+        st.caption("""
+          **How Rules Work**
+          ---
+          
+          - **Description Text**: Full or partial transaction text to match
+          - **Match Type**: Whether the text must equal or contain the description
+          - **Merchant**: Merchant name to assign
+          - **Category**: Category to assign
+          - **Subcategory**: Optional category for more granular data
+          - **Is Recurring**: Toggle if transaction is expected
+          - **Priority**: Higher numbers take precedence
+
+          **Keep in mind that rules cannot be deleted! Only deactivated through `🔧 Update`**
+
+          ---
+        """)
+
+      added_rules_de = st.data_editor(
+        [added_rules_base_dict],
         column_config={
-          "match_text": st.column_config.TextColumn("Description Text", required=True, help="How the rule matches the transaction"),
-          "match_type": st.column_config.SelectboxColumn("Match Type", options=["equals", "contains"], required=True, help="How the rule matches the transaction"),
-          "merchant": st.column_config.TextColumn("Merchant", required=True, help="The merchant of the transaction"),
-          "category": st.column_config.TextColumn("Category", required=True, help="The category of the transaction"),
-          "subcategory": st.column_config.TextColumn("Subcategory", required=False, help="(Optional) The subcategory of the transaction"),
+          "match_text": st.column_config.TextColumn("Description Text",help="How the rule matches the transaction"),
+          "match_type": st.column_config.SelectboxColumn("Match Type", options=["equals", "contains"],help="How the rule matches the transaction"),
+          "merchant": st.column_config.TextColumn("Merchant",help="The merchant of the transaction"),
+          "category": st.column_config.TextColumn("Category",help="The category of the transaction"),
+          "subcategory": st.column_config.TextColumn("Subcategory (Optional)", help="(Optional) The subcategory of the transaction"),
           "is_recurring": st.column_config.CheckboxColumn("Is Recurring", help="Checked if the transaction is recurring"),
-          "priority": st.column_config.NumberColumn("Priority", help="The Priority of Match (0 being lowest pri, 10 being highest)", required=True, min_value=0, max_value=10, step=1, format="%d")
+          "priority": st.column_config.NumberColumn("Priority", help="The Priority of Match (0 being lowest pri, 10 being highest)",min_value=0, max_value=10, step=1, format="%d")
         },
         width='stretch',
-        num_rows="dynamic"
+        num_rows="dynamic",
+        key='add_rules_table_key'
       )
 
+    with col1_1:
+      if st.button("👍 Add New Rule(s)", type="secondary", use_container_width=True):
+        
+        
+        added_rules_list = [tuple(dict(r).values()) for r in added_rules_de]
+        required_columns_idx = [
+          list(added_rules_base_dict.keys()).index(key) 
+            for key in ["match_text", "match_type", "merchant", "category", "priority"]
+        ]
+        all_rules_valid = True
+        for rule_row in added_rules_list:
+          if not re.tuple_is_valid(rule_row, required_columns_idx):
+            all_rules_valid = False
+                  
+    
+        if all_rules_valid:
+          re.add_rule(db, added_rules_list)
+
+          # Display toast warnings if matched descriptions or existing rules exist
+          if len(re.matched_descriptions_rules) > 0:
+            st.session_state.matched_descriptions_rules_warning = True
+          elif len(re.already_exists_rules) > 0:
+            st.session_state.already_exists_rules_warning = True
+
+          st.session_state.rules_add_section_disabled = True
+          st.session_state.rules_loaded = False
+          st.session_state.rules_add_button_disabled = False
+          st.session_state.rules_update_button_disabled = False
+          st.session_state.rules_added_success = True
+          st.session_state.rules_add_help_captions = False
+          st.rerun()
+        else:
+          st.toast("Invalid rules found, all required columns should be filled.", icon="⛔")
+
+      if st.button("👎 Cancel", type="secondary", use_container_width=True):
+        st.session_state.rules_add_section_disabled = True
+        st.session_state.rules_add_button_disabled = False
+        st.session_state.rules_update_button_disabled = False
+        st.session_state.rules_add_help_captions = False
+        st.rerun()
+
+      if st.button("💡 Help", type="secondary", use_container_width=True):
+        if st.session_state.rules_add_help_captions:
+          st.session_state.rules_add_help_captions = False
+        else:
+          st.session_state.rules_add_help_captions = True 
+        st.rerun()
+        
   # Rules Table
   st.divider()
 
   # List unkown transactions
   if uploaded_file:
-    _, _, _, at = get_backend()
     if at.unknown_transactions_df.empty:
       st.info("**All transactions are categorized!** There are no 'Unknown' merchants or 'Uncategorized' transactions to review.", icon="✨")
     else:
@@ -238,6 +309,7 @@ with tab_rules:
           "category": st.column_config.TextColumn("Category",help="The determined category of the transaction"),
           "subcategory": st.column_config.TextColumn("Subcategory",help="The determined subcategory of the transaction"),
           "is_recurring": st.column_config.CheckboxColumn("Is Recurring",help="Checked if the transaction is recurring"),
+          "active": st.column_config.CheckboxColumn("Active",help="Checked if the rule is active"),
           "flow_type": None,
           "rule_id": None
         },
@@ -249,18 +321,18 @@ with tab_rules:
 
   # List rules
   # Only load rules on start or when rules are updated
-  db, _, re, _ = get_backend()
   if not st.session_state.rules_loaded:
     re.load_rules(db)
     st.toast("Rules Loaded", icon="✅")
     st.session_state.rules_loaded = True
 
+  rules_df = pd.DataFrame(re.rules)
+  rules_df = rules_df[rules_df['merchant'] != 'Unknown']
+  rules_df = rules_df.reset_index(drop=True)
   merchant_rules_de = st.data_editor(
-    pd.DataFrame(re.rules),
+    rules_df,
     column_config={
       "rule_id": None,
-      "created_at": None,
-      "updated_at": None,
       "match_text": st.column_config.TextColumn("Description Text",help="How the rule matches the transaction"),
       "match_type": st.column_config.TextColumn("Match Type",help="How the rule matches the transaction"),
       "merchant": st.column_config.TextColumn("Merchant",help="The determined merchant of the transaction"),
@@ -303,7 +375,6 @@ with tab_dashboard:
 # --- TAB 4: IMPORTS ---
 with tab_imports:
   st.subheader("Imports Manager")
-  db, im, _, _ = get_backend()
   current_imports_de = st.data_editor(
     st.session_state.current_imports_df,
     column_config={
@@ -365,3 +436,11 @@ with tab_logs:
     st.code(log_text, language="python")
   else:
     st.info("No logs captured yet. Try uploading a file!")
+
+# --- TAB 5: ABOUT ---
+with tab_about:
+  readme_path = Path("README.md")
+  if readme_path.exists():
+    st.markdown(readme_path.read_text())
+  else:
+    st.error("README.md not found")
