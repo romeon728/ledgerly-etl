@@ -112,13 +112,14 @@ with tab_process:
         st.write("🤔 Have you reviewed your transaction?")
         col1_1, col1_2 = st.columns(2)
         if col1_1.button("👍 Confirm", use_container_width=True, type="primary"):
-          st.session_state.import_id = im.add_import(db, at.enriched_transactions)
+          im.add_import(db, at.enriched_transactions)
+          st.session_state.import_id = im.import_id
           if st.session_state.import_id == 0:
             st.session_state.show_import_error = True
             st.rerun()
 
           # If no import error, upload to DB
-          result = at.add_transactions(db, st.session_state.import_id)
+          at.add_transactions(db, st.session_state.import_id)
 
           st.session_state.confirm_phase = False
           st.session_state.transactions_loaded = False
