@@ -4,13 +4,11 @@ log_buffer = setup_logging()
 logger = logging.getLogger("ledgerly")
 from agents.database import LedgerlyDatabase
 
-from db.rules import RulesEngine
-
 """
 Cleans the transactions 
 """
 
-def enrich_transaction(num_matches:int, tx:dict, re:RulesEngine):
+def enrich_transaction(num_matches:int, tx:dict, re):
   """
   Entrypoint for enriching transactions.
   """
@@ -60,7 +58,7 @@ def enrich_transaction(num_matches:int, tx:dict, re:RulesEngine):
   exit(1)
 
 
-def enrich_parsed_transactions(parsed_transactions:dict, db:LedgerlyDatabase, re:RulesEngine) -> dict:
+def enrich_parsed_transactions(parsed_transactions:dict, db:LedgerlyDatabase, re) -> dict:
   # Load merchant rules and account transactions
   re.load_rules(db)
 

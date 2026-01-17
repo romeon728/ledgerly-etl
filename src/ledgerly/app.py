@@ -8,9 +8,7 @@ log_handler = setup_logging()
 logger = logging.getLogger("ledgerly")
 from agents.database import LedgerlyDatabase
 
-from db.imports import ImportManager
-from db.rules import RulesEngine
-from db.transactions import AccountTransactions
+from db.sessions import ImportManager, RulesEngine, AccountTransactions
 
 @st.cache_resource
 def get_backend():
