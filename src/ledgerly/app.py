@@ -3,12 +3,11 @@ import pandas as pd
 from pathlib import Path
 
 import logging
-from logger_config import setup_logging
-
+from agents.logger_config import setup_logging
 log_handler = setup_logging()
 logger = logging.getLogger("ledgerly")
+from agents.database import LedgerlyDatabase
 
-from db.agents.database import LedgerlyDatabase
 from db.imports import ImportManager
 from db.rules import RulesEngine
 from db.transactions import AccountTransactions

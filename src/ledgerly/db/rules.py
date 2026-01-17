@@ -1,16 +1,12 @@
-#!/usr/bin/env python3
-
 import json
 import pandas as pd
 import math
 
 import logging
-from logger_config import setup_logging
-
+from agents.logger_config import setup_logging
 log_buffer = setup_logging()
 logger = logging.getLogger("ledgerly")
-
-from db.agents.database import LedgerlyDatabase
+from agents.database import LedgerlyDatabase
 
 class RulesEngine():
 

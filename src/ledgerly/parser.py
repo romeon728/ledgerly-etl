@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-
-import logging
-from logger_config import setup_logging
-
-log_buffer = setup_logging()
-logger = logging.getLogger("ledgerly")
-
 import argparse
 from pathlib import Path
 import csv
@@ -15,6 +7,11 @@ from dotenv import load_dotenv
 import re
 import hashlib
 import io
+
+import logging
+from agents.logger_config import setup_logging
+log_buffer = setup_logging()
+logger = logging.getLogger("ledgerly")
 
 """
 parseCSV.py:

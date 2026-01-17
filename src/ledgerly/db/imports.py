@@ -1,13 +1,9 @@
-#!/usr/bin/env python3
-
 import pandas as pd
 import logging
-from logger_config import setup_logging
-
+from agents.logger_config import setup_logging
 log_buffer = setup_logging()
 logger = logging.getLogger("ledgerly")
-
-from db.agents.database import LedgerlyDatabase
+from agents.database import LedgerlyDatabase
 
 class ImportManager():
 
