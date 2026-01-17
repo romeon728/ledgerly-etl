@@ -10,6 +10,9 @@ log_buffer = setup_logging()
 logger = logging.getLogger("ledgerly")
 
 from db.agents.database import LedgerlyDatabase
+from db.rules import RulesEngine
+import parser
+import enrich
 
 class AccountTransactions():
 
@@ -20,62 +23,34 @@ class AccountTransactions():
   # STREAMLIT PIPELINE FUNCTIONS
   # --------------------------------------------------
 
-  def process_transactions_df(self, enriched_transactions) -> pd.DataFrame:
-    self.enriched_transactions_df = pd.DataFrame(list(enriched_transactions["transactions"]))
-    self.enriched_transactions_df['date'] = pd.to_datetime(self.enriched_transactions_df['date']).dt.date
-    return self.enriched_transactions_df
+  def process_transactions(self, uploaded_file, db:LedgerlyDatabase, re:RulesEngine):
+    # Parse and enrich transactions
+    self.parsed_transactions = parser.parse_csv(uploaded_file)
+    self.enriched_transactions = enrich.enrich_parsed_transactions(self.parsed_transactions, db, re)
 
-  def process_unknown_transactions_df(self):
+    # Convert transactions into DataFrame
+    self.enriched_transactions_df = pd.DataFrame(list(self.enriched_transactions["transactions"]))
+    self.enriched_transactions_df['date'] = pd.to_datetime(self.enriched_transactions_df['date']).dt.date
+
+    # Extract unknown transactions into DataFrame
     self.unknown_transactions_df = self.enriched_transactions_df[
       (self.enriched_transactions_df["merchant"] == "Unknown") & 
       (self.enriched_transactions_df["category"] == "Uncategorized")
     ]
     self.unknown_transactions_df = self.unknown_transactions_df.reset_index(drop=True)
-    return self.unknown_transactions_df
+
+    return 0
+  
   # --------------------------------------------------
   # CONSOLE PIPELINE FUNCTIONS
   # --------------------------------------------------
   
-  def add_import(self, db:LedgerlyDatabase, enriched_transactions:dict):
-    """
-    Docstring for add_import
-    """ 
-
-    db.connect()
-
-    import_info = enriched_transactions["import_info"]
-    statement_period = enriched_transactions["statement_period"]
-    # Check if hash is already being stored in the database
-    if db.fetchone(
-        query="SELECT 1 FROM imports WHERE file_hash = %s;",
-        params=(import_info["file_hash"],)
-      ):
-      logger.info("Duplicate File: This file has already been processed")
-      exit(1)
-
-    # Insert import, since hash does not exist in DB yet
-    import_id = db.execute(
-      query="""
-        INSERT INTO imports (filename, file_hash, start_date, end_date, row_count)
-        VALUES (%s, %s, %s, %s, %s)
-        RETURNING import_id;
-      """,
-      params=(import_info["filename"], import_info["file_hash"], statement_period["start"], statement_period["end"], import_info["row_count"])
-    )
-
-    db.commit()
-    db.close()
-
-    logger.info("New import successfully added to DB")
-
-    return import_id
-
-  def add_transactions(self, db:LedgerlyDatabase, import_id:int, enriched_transactions:dict):
+  def add_transactions(self, db:LedgerlyDatabase, import_id:int):
 
     db.connect()
 
     logger.info("Adding account information to database if does not exist")
-    account_info = enriched_transactions['account']
+    account_info = self.enriched_transactions['account']
     account_id = db.execute(
       query="""
         INSERT INTO accounts (bank, account_type, account_number)
@@ -88,12 +63,13 @@ class AccountTransactions():
     )
     logger.info(f"Account ID: {account_id}")
     
-    num_tx_added = 0
+    self.num_tx_added = 0
     counts = Counter()
-    for tx in enriched_transactions["transactions"]:
+    for tx in self.enriched_transactions["transactions"]:
       if not isinstance(tx, dict):
         logger.error(f"Transaction is not expected dictionary: {tx}")
-        exit(1)
+        db.close()
+        return 0
 
       key = (tx.get("date"), tx.get("description"), tx.get("amount"), tx.get("merchant"), tx.get("category"))
       counts[key] += 1
@@ -120,13 +96,13 @@ class AccountTransactions():
             tx.get("category"), tx.get("subcategory"), tx.get("is_recurring"), tx.get("flow_type"), seq 
           )
         )
-        num_tx_added += 1
+        self.num_tx_added += 1
       else:
         logger.warning(f"Skipping Duplicate Row: {key}")
     
-    logger.info(f"{num_tx_added} transactions added to DB")
+    logger.info(f"{self.num_tx_added} transactions added to DB")
 
     db.commit()
     db.close()
 
-    return 0
+    return self.num_tx_added
