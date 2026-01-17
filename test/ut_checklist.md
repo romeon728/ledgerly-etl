@@ -1,14 +1,12 @@
 # Unit Test Checklist
 
-| Tested | File | Unit Test | Description |
-| ------ | ---- | --------- | ----------- |
-|  [X]   | | | |
-|  [X]   | | | |
-|  [X]   | | | |
-|  [X]   | | | |
-|  [X]   | | | |
-|  [X]   | | | |
-|  [X]   | | | |
-|  [X]   | | | |
-|  [X]   | | | |
-|  [X]   | | | |
+| Tested | Category |   Test Type   | Unit Test | Description |
+| ------ |  | ------------- | --------- | ----------- |
+|  [X]   | agents | database      | TBD
+|  [X]   | agents | logger_config | TBD
+|  [X]   | db | imports       | 
+|  [X]   | db | rules         | 
+|  [X]   | db | transactions  | 
+|  [X]   |    | app           | 
+|  [X]   |    | enrich        | 
+|  [X]   |    | parser        | 
