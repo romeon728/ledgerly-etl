@@ -1,5 +1,7 @@
 import pandas as pd
 import math
+import os
+import json
 
 import logging
 from agents.logger_config import setup_logging
@@ -77,6 +79,17 @@ class RulesEngine():
   def add_unknown_rule(self, db:LedgerlyDatabase):
     unknown_rule = [("Unknown", "contains", "Unknown", "Uncategorized", "Uncategorized", False, 0)]
     self.add_rule(db, unknown_rule)
+    self.load_rules(db)
+  
+  def populate_json_rules(self, db:LedgerlyDatabase):
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    rules_json = f"{current_dir}/../ml/data/merchant_rules.json"
+    rules_to_add = []
+    with open(rules_json, 'r') as f:
+      rules_data = list(json.load(f))[1:]
+      for rule in rules_data:
+        rules_to_add.append(tuple(list(dict(rule).values())[1:-1]))
+    self.add_rule(db, rules_to_add)
     self.load_rules(db)
 
 ##################################################

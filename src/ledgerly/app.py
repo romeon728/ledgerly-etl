@@ -366,6 +366,13 @@ with tab_rules:
     disabled=st.session_state.rules_update_table_disabled
   )
 
+  if len(rules_df) == 0:
+    st.session_state.populate_stored_rules_button_disabled = False
+  else:
+    st.session_state.populate_stored_rules_button_disabled = True
+  if st.button("🗘 Populate Stored Rules", type="primary", disabled=st.session_state.populate_stored_rules_button_disabled):
+    re.populate_json_rules(db)
+
 # --- TAB 3: DASHBOARD ---
 with tab_dashboard:
   st.subheader("Dashboard")
