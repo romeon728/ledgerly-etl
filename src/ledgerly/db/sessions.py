@@ -38,8 +38,8 @@ class ImportManager():
     queries.delete_imports(db, imports_to_del)
   
   def add_import(self, db:LedgerlyDatabase, enriched_transactions:dict):
-    queries.add_import(db, enriched_transactions)
-    self.import_id = logger.info("New import successfully added to DB")
+    self.import_id = queries.add_import(db, enriched_transactions)
+    logger.info("New import successfully added to DB")
     logger.info(f"Import ID: {self.import_id}")
     self.get_imports(db)
 
@@ -74,6 +74,10 @@ class RulesEngine():
       return True
     return all(is_valid(t[i]) for i in indexes)
 
+  def add_unknown_rule(self, db:LedgerlyDatabase):
+    unknown_rule = [("Unknown", "contains", "Unknown", "Uncategorized", "Uncategorized", False, 0)]
+    self.add_rule(db, unknown_rule)
+    self.load_rules(db)
 
 ##################################################
 # TRANSACTIONS SESSION

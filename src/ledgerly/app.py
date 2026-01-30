@@ -69,6 +69,12 @@ if st.session_state.get("upload_success"):
   else:
     st.toast(f"{at.num_tx_added}/{len(st.session_state.enriched_transactions_df)} transactions uploaded successfully!", icon="✅")
     st.toast(f"{len(st.session_state.enriched_transactions_df) - at.num_tx_added} transactions skipped due to duplication.", icon="⚠️")
+
+  # Reset enriched/unknown transactions after successful upload
+  st.session_state.enriched_transactions = {}
+  st.session_state.enriched_transactions_df = None
+  st.session_state.unknown_transactions_df = None
+
   del st.session_state.upload_success
 if st.session_state.get("show_import_error"):
   st.toast("**Import Error:** The uploaded CSV already exists in Database.", icon="💀")
@@ -128,9 +134,6 @@ with tab_process:
           at.add_transactions(db, st.session_state.import_id, st.session_state.enriched_transactions)
 
           # Reset session states
-          st.session_state.enriched_transactions = {}
-          st.session_state.enriched_transactions_df = None
-          st.session_state.unknown_transactions_df = None
           st.session_state.confirm_phase = False
           st.session_state.transactions_loaded = False
           st.session_state.file_uploader_n += 1
@@ -335,6 +338,13 @@ with tab_rules:
     st.session_state.rules_loaded = True
 
   rules_df = pd.DataFrame(re.rules)
+
+  # Add Unknown Rule if rules_df is empty and refresh
+  if len(rules_df) == 0:
+    re.add_unknown_rule(db)
+    st.session_state.rules_loaded = False
+    st.rerun()
+
   rules_df = rules_df[rules_df['merchant'] != 'Unknown']
   rules_df = rules_df.reset_index(drop=True)
   merchant_rules_de = st.data_editor(

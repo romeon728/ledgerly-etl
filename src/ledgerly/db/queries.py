@@ -302,12 +302,12 @@ def add_transactions(db:LedgerlyDatabase, import_id:int, enriched_transactions:d
     if not exists:
       db.execute(
         query="""
-          INSERT INTO transactions (account_id, import_id, rule_id, date, description, amount, 
+          INSERT INTO transactions (import_id, account_id, rule_id, date, description, amount, 
             merchant, category, subcategory, is_recurring, flow_type, sequence)
           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         params=(
-          account_id, import_id, tx.get("rule_id"), tx.get("date"), tx.get("description"), tx.get("amount"), tx.get("merchant"), 
+          import_id, account_id, tx.get("rule_id"), tx.get("date"), tx.get("description"), tx.get("amount"), tx.get("merchant"), 
           tx.get("category"), tx.get("subcategory"), tx.get("is_recurring"), tx.get("flow_type"), seq 
         )
       )

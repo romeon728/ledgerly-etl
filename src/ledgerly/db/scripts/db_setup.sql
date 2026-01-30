@@ -45,7 +45,7 @@ CREATE TABLE accounts (
 -- 3. Link transactions to the account and import source
 CREATE TABLE transactions (
 transaction_id    SERIAL          PRIMARY KEY,
-  import_id       INTEGER         REFERENCES imports(import_id) ON DELETE CASCADE, -- If a log is deleted, also deletes the data
+  import_id       INTEGER         NOT NULL REFERENCES imports(import_id) ON DELETE CASCADE, -- If a log is deleted, also deletes the data
   account_id      INTEGER         NOT NULL REFERENCES accounts(account_id),
   rule_id         INTEGER         NOT NULL REFERENCES rules(rule_id),
   date            DATE            NOT NULL,

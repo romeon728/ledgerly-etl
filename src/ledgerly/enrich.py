@@ -52,8 +52,10 @@ def enrich_transaction(num_matches:int, tx:dict, loaded_rules:list):
     
     else:
       continue
-
-  logger.error("INVESTIGATE WHY IT GOT THIS FAR")
+  
+  msg = "!!!NO RULES ARE LOADED INTO DATABASE!!!"
+  logger.error(msg)
+  print(msg)
   exit(1)
 
 
