@@ -8,8 +8,6 @@ logger = logging.getLogger("ledgerly")
 from agents.database import LedgerlyDatabase
 
 import db.queries as queries
-import parser
-import enrich
 
 """
 Docstring for ledgerly.db.sessions
@@ -86,31 +84,5 @@ class AccountTransactions():
   def __init__(self):
     logger.info("AccountTransactions (Class): Initialized")
 
-  # --------------------------------------------------
-  # STREAMLIT PIPELINE FUNCTIONS
-  # --------------------------------------------------
-
-  def process_transactions(self, uploaded_file, db:LedgerlyDatabase, re:RulesEngine):
-    # Parse and enrich transactions
-    self.parsed_transactions = parser.parse_csv(uploaded_file)
-    self.enriched_transactions = enrich.enrich_parsed_transactions(self.parsed_transactions, db, re)
-
-    # Convert transactions into DataFrame
-    self.enriched_transactions_df = pd.DataFrame(list(self.enriched_transactions["transactions"]))
-    self.enriched_transactions_df['date'] = pd.to_datetime(self.enriched_transactions_df['date']).dt.date
-
-    # Extract unknown transactions into DataFrame
-    self.unknown_transactions_df = self.enriched_transactions_df[
-      (self.enriched_transactions_df["merchant"] == "Unknown") & 
-      (self.enriched_transactions_df["category"] == "Uncategorized")
-    ]
-    self.unknown_transactions_df = self.unknown_transactions_df.reset_index(drop=True)
-
-    return 0
-  
-  # --------------------------------------------------
-  # CONSOLE PIPELINE FUNCTIONS
-  # --------------------------------------------------
-  
-  def add_transactions(self, db:LedgerlyDatabase, import_id:int):
-    self.num_tx_added = queries.add_transactions(db, import_id, self.enriched_transactions)
+  def add_transactions(self, db:LedgerlyDatabase, import_id:int, enriched_transactions:dict):
+    self.num_tx_added = queries.add_transactions(db, import_id, enriched_transactions)

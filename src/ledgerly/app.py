@@ -9,6 +9,7 @@ logger = logging.getLogger("ledgerly")
 from agents.database import LedgerlyDatabase
 
 from db.sessions import ImportManager, RulesEngine, AccountTransactions
+import process
 
 @st.cache_resource
 def get_backend():
@@ -32,6 +33,9 @@ if "startup_done" not in st.session_state:
   st.session_state.file_uploader_n = 0
   st.session_state.transactions_loaded = False
   st.session_state.import_id = 0
+  st.session_state.enriched_transactions = {}
+  st.session_state.enriched_transactions_df = None
+  st.session_state.unknown_transactions_df = None
 
   # --- RULES TAB
   st.session_state.rules_loaded = False
@@ -58,13 +62,13 @@ if "current_imports_df" not in st.session_state:
 # --- TOASTS ---
 # > Process & Upload Toasts
 if st.session_state.get("upload_success"):
-  if at.num_tx_added == len(at.enriched_transactions_df):
+  if at.num_tx_added == len(st.session_state.enriched_transactions_df):
     st.toast("All transactions uploaded successfully!", icon="✅")
   elif at.num_tx_added == 0:
     st.toast("No transactions were uploaded successfully.", icon="🚨")
   else:
-    st.toast(f"{at.num_tx_added}/{len(at.enriched_transactions_df)} transactions uploaded successfully!", icon="✅")
-    st.toast(f"{len(at.enriched_transactions_df) - at.num_tx_added} transactions skipped due to duplication.", icon="⚠️")
+    st.toast(f"{at.num_tx_added}/{len(st.session_state.enriched_transactions_df)} transactions uploaded successfully!", icon="✅")
+    st.toast(f"{len(st.session_state.enriched_transactions_df) - at.num_tx_added} transactions skipped due to duplication.", icon="⚠️")
   del st.session_state.upload_success
 if st.session_state.get("show_import_error"):
   st.toast("**Import Error:** The uploaded CSV already exists in Database.", icon="💀")
@@ -103,24 +107,30 @@ with tab_process:
     if uploaded_file:
       # This triggers your parsing pipeline automatically
       if not st.session_state.transactions_loaded:
-        at.process_transactions(uploaded_file, db, re)
+        st.session_state.enriched_transactions, st.session_state.enriched_transactions_df, st.session_state.unknown_transactions_df = \
+          process.process_transactions(uploaded_file, re.rules)
+
         st.toast("Transactions Loaded", icon="✅")
-        st.success(f"Parsed {len(at.enriched_transactions_df)} transactions")
+        st.success(f"Parsed {len(st.session_state.enriched_transactions_df)} transactions")
         st.session_state.transactions_loaded = True
       
       if st.session_state.get("confirm_phase"):
         st.write("🤔 Have you reviewed your transaction?")
         col1_1, col1_2 = st.columns(2)
         if col1_1.button("👍 Confirm", use_container_width=True, type="primary"):
-          im.add_import(db, at.enriched_transactions)
+          im.add_import(db, st.session_state.enriched_transactions)
           st.session_state.import_id = im.import_id
           if st.session_state.import_id == 0:
             st.session_state.show_import_error = True
             st.rerun()
 
           # If no import error, upload to DB
-          at.add_transactions(db, st.session_state.import_id)
+          at.add_transactions(db, st.session_state.import_id, st.session_state.enriched_transactions)
 
+          # Reset session states
+          st.session_state.enriched_transactions = {}
+          st.session_state.enriched_transactions_df = None
+          st.session_state.unknown_transactions_df = None
           st.session_state.confirm_phase = False
           st.session_state.transactions_loaded = False
           st.session_state.file_uploader_n += 1
@@ -141,12 +151,12 @@ with tab_process:
 
   with col2:
     st.subheader("2. Review")
-    if st.session_state.transactions_loaded and not at.unknown_transactions_df.empty:
-      st.warning(f"{len(at.unknown_transactions_df)} Unknown Transactions found.")
+    if st.session_state.transactions_loaded and not st.session_state.unknown_transactions_df.empty:
+      st.warning(f"{len(st.session_state.unknown_transactions_df)} Unknown Transactions found.")
     st.caption("💡 Unrecognized transactions can be configured within the **⚙️ Rules Engine**.")
     if uploaded_file:
       st.data_editor(
-        at.enriched_transactions_df,
+        st.session_state.enriched_transactions_df,
         column_config={
           "date": st.column_config.DateColumn("Transaction Date",format="MMM DD, YYYY",help="The date the transaction cleared the bank"),
           "description": st.column_config.TextColumn("Description",help="Description of the transaction"),
@@ -294,11 +304,11 @@ with tab_rules:
 
   # List unkown transactions
   if uploaded_file:
-    if at.unknown_transactions_df.empty:
+    if st.session_state.unknown_transactions_df.empty:
       st.info("**All transactions are categorized!** There are no 'Unknown' merchants or 'Uncategorized' transactions to review.", icon="✨")
     else:
       st.data_editor(
-        at.unknown_transactions_df,
+        st.session_state.unknown_transactions_df,
         column_config={
           "date": st.column_config.DateColumn("Transaction Date",format="MMM DD, YYYY",help="The date the transaction cleared the bank"),
           "description": st.column_config.TextColumn("Description",help="Description of the transaction"),

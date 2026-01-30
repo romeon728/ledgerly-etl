@@ -2,13 +2,12 @@ import logging
 from agents.logger_config import setup_logging
 log_buffer = setup_logging()
 logger = logging.getLogger("ledgerly")
-from agents.database import LedgerlyDatabase
 
 """
 Cleans the transactions 
 """
 
-def enrich_transaction(num_matches:int, tx:dict, re):
+def enrich_transaction(num_matches:int, tx:dict, loaded_rules:list):
   """
   Entrypoint for enriching transactions.
   """
@@ -33,7 +32,7 @@ def enrich_transaction(num_matches:int, tx:dict, re):
     return False
 
   description = tx.get("description")
-  for rule in re.rules:
+  for rule in loaded_rules:
     # Skip inactive rules
     if not rule.get("active", True):
       continue
@@ -58,10 +57,7 @@ def enrich_transaction(num_matches:int, tx:dict, re):
   exit(1)
 
 
-def enrich_parsed_transactions(parsed_transactions:dict, db:LedgerlyDatabase, re) -> dict:
-  # Load merchant rules and account transactions
-  re.load_rules(db)
-
+def enrich_parsed_transactions(parsed_transactions:dict, loaded_rules:list) -> dict:
   logger.info("Starting transaction enrichment...")
   logger.info(f"{len(parsed_transactions['transactions'])} Transactions Loaded")
   logger.info(f"\tStatement Period: {parsed_transactions['statement_period']['start']} -> {parsed_transactions['statement_period']['end']}")
@@ -71,7 +67,7 @@ def enrich_parsed_transactions(parsed_transactions:dict, db:LedgerlyDatabase, re
   enriched_transactions = []
   num_matches = 0
   for tx in transactions:
-    num_matches, enriched_tx = enrich_transaction(num_matches, tx, re) 
+    num_matches, enriched_tx = enrich_transaction(num_matches, tx, loaded_rules) 
     enriched_transactions.append(enriched_tx)
 
   logger.info(f"Matches found: {num_matches}/{len(transactions)}")
