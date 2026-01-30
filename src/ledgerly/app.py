@@ -100,7 +100,9 @@ if st.session_state.get("logs_cleared"):
 # Page Config: Makes it wide-screen and gives it a title icon
 st.set_page_config(page_title="Ledgerly", page_icon="💸", layout="wide")
 st.title("💸 Ledgerly")
-tab_process, tab_rules, tab_dashboard, tab_imports, tab_logs, tab_about = st.tabs(["📤 Process & Upload", "⚙️ Rules Engine", "📊 Dashboard", "📂 Imports", "📜 Logs", "💡 About"])
+tab_process, tab_rules, tab_dashboard, tab_imports, tab_transactions, tab_logs, tab_about = st.tabs(
+  ["📤 Process & Upload", "⚙️ Rules Engine", "📊 Dashboard", "📂 Imports", "💳 Transactions", "📜 Logs", "💡 About"]
+)
 
 # --- TAB 1: UPLOAD & ENRICH ---
 with tab_process:
@@ -431,7 +433,11 @@ with tab_imports:
       del st.session_state.current_imports_df
       st.rerun()
 
-# --- TAB 5: LOGS ---
+# --- TAB 5: TRANSACTIONS ---
+with tab_transactions:
+  st.subheader("Account Transactions")
+
+# --- TAB 6: LOGS ---
 with tab_logs:
   st.subheader("System Logs")
   
@@ -462,7 +468,7 @@ with tab_logs:
   else:
     st.info("No logs captured yet. Try uploading a file!")
 
-# --- TAB 5: ABOUT ---
+# --- TAB 7: ABOUT ---
 with tab_about:
   readme_path = Path("README.md")
   if readme_path.exists():
