@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ledgerly"
+version = "0.2.0"
+description = "Financial ETL and categorization pipeline powered by rules & vLLM."
+authors = [{ name = "Nick" }]
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "pandas>=2.0.0",
+    "streamlit>=1.30.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.25.0",            # For async calls to remote vLLM endpoint
+    "openai>=1.0.0",            # Standard client for vLLM API compatibility
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.2.0",
+]
+
+[project.scripts]
+ledgerly = "ledgerly.app:main"

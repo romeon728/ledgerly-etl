@@ -1,0 +1,39 @@
+ledgerly-etl
+├── .env.example
+├── .gitignore
+├── docker-compose.yml
+├── Dockerfile
+├── pyproject.toml
+├── README.md
+├── start.sh                      # Zero-touch launcher script
+├── scripts
+│   └── db_setup.sql              # Init script for local Postgres container
+├── src
+│   └── ledgerly
+│       ├── __init__.py
+│       ├── config.py             # Pydantic BaseSettings (reads Docker / .env vars)
+│       ├── app.py                # Pure Streamlit UI
+│       ├── core
+│       │   ├── exceptions.py     # Custom domain exceptions
+│       │   ├── logging.py        # Thread-safe logging handler
+│       │   └── __init__.py
+│       ├── db
+│       │   ├── connection.py     # Database Connection Pool
+│       │   ├── models.py         # Data models / Schemas
+│       │   ├── queries.py        # Safe SQL execution functions
+│       │   └── __init__.py
+│       ├── extractors
+│       │   ├── base.py           # Abstract Base Extractor
+│       │   └── csv_parser.py     # Native Bank CSV extractor
+│       ├── inference
+│       │   ├── vllm_client.py    # Async vLLM Client (Points strictly to local host)
+│       │   ├── prompts.py        # Structured categorization prompts
+│       │   └── schema.py         # Pydantic schemas for Guided Decoding
+│       └── pipeline
+│           ├── enricher.py       # Hybrid Rule Engine + Local vLLM Pipeline
+│           └── runner.py         # ETL Orchestration engine
+└── tests
+    ├── conftest.py
+    ├── test_csv_parser.py
+    ├── test_enricher.py
+    └── test_vllm_client.py

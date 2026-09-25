@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ledgerly-db
+    restart: always
+    environment:
+      POSTGRES_DB: ledgerly_db
+      POSTGRES_USER: ledgerly
+      POSTGRES_PASSWORD: ledgerly_local_password
+    ports:
+      - "5432:5432"
+    volumes:
+      # Automatically run your schema migration on first startup
+      - ./scripts/db_setup.sql:/docker-entrypoint-initdb.d/init.sql
+      # Persist data locally on the host machine
+      - ledgerly_pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: ledgerly-app
+    restart: stdout
+    ports:
+      - "8501:8501"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=ledgerly_db
+      - DB_USER=ledgerly
+      - DB_PASSWORD=ledgerly_local_password
+      # Points to wherever the user has vLLM running (local host or network GPU box)
+      - VLLM_HOST=${VLLM_HOST:-http://host.docker.internal:8000/v1}
+      - VLLM_MODEL=${VLLM_MODEL:-Qwen/Qwen2.5-7B-Instruct}
+    depends_on:
+      - db
+
+volumes:
+  ledgerly_pgdata:
