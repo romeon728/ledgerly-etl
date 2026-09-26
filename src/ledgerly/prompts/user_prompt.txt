@@ -1,0 +1,4 @@
+Transaction Details:
+- Raw Description: "{description}"
+- Amount: {amount}
+- Account Type: {account_type}

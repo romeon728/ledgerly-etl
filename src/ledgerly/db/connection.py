@@ -1,33 +1,43 @@
+import os
 from contextlib import contextmanager
 import psycopg2
-from psycopg2.extensions import connection as PostgresConnection
-from ledgerly.config import settings
+from psycopg2.extras import RealDictCursor
 
 
-class DatabaseConnection:
-    """Manages secure connections to the PostgreSQL database."""
+def get_db_url() -> str:
+    """Constructs or retrieves the database connection string."""
+    return os.getenv(
+        "DATABASE_URL",
+        "postgresql://ledgerly:ledgerly_local_sec_pass@localhost:5433/ledgerly_db",
+    )
 
-    @staticmethod
-    def get_connection() -> PostgresConnection:
-        """Establishes and returns a new database connection."""
-        return psycopg2.connect(
-            host=settings.db_host,
-            port=settings.db_port,
-            dbname=settings.db_name,
-            user=settings.db_user,
-            password=settings.db_password,
-        )
 
-    @classmethod
-    @contextmanager
-    def session(cls):
-        """Context manager for safe transaction handling and auto-closing connections."""
-        conn = cls.get_connection()
-        try:
-            yield conn
+@contextmanager
+def get_db_connection():
+    """Context manager providing a transactional PostgreSQL connection."""
+    conn = psycopg2.connect(get_db_url())
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@contextmanager
+def get_db_cursor(commit: bool = True):
+    """Context manager directly providing a cursor and handling commit/rollback."""
+    conn = psycopg2.connect(get_db_url())
+    cursor = conn.cursor()
+    try:
+        yield cursor
+        if commit:
             conn.commit()
-        except Exception:
-            conn.rollback()
-            raise
-        finally:
-            conn.close()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cursor.close()
+        conn.close()

@@ -1,23 +1,29 @@
-SYSTEM_PROMPT = """You are a financial transaction classification engine.
-Your task is to analyze raw bank transaction descriptions and extract:
-1. Clean Merchant Name: Strip out internal bank codes, dates, transaction numbers, and location tags (e.g., "VISA DDA PUR AP 403629 SPOTIFY 877 778 1161" -> "Spotify").
-2. Standardized Category & Subcategory: Map the transaction to the most appropriate standard expense/income classification.
+from pathlib import Path
+from ledgerly.inference.schema import ALLOWED_CATEGORIES, ALLOWED_SUBCATEGORIES
 
-Rules:
-- Keep merchant names clean, concise, and recognizable.
-- Payroll, direct deposits, or transfer credits should be categorized under Income or Financial & Transfers.
-- Vehicle payments or gas belong under Transportation.
-"""
+PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
-
-def build_user_prompt(
-    description: str, amount: float, account_type: str = "Checking"
-) -> str:
-    formatted_amount = (
-        f"-${abs(amount):.2f}" if amount < 0 else f"${amount:.2f}"
+def build_system_prompt() -> str:
+    categories_str = "\n".join(f"- {c}" for c in ALLOWED_CATEGORIES)
+    subcategories_str = "\n".join(f"- {s}" for s in ALLOWED_SUBCATEGORIES)
+    
+    template_path = PROMPTS_DIR / "system_prompt.txt"
+    template_content = template_path.read_text(encoding="utf-8")
+    
+    # Simple replacement: 100% immune to curly braces and dollar signs
+    return (
+        template_content
+        .replace("{categories_str}", categories_str)
+        .replace("{subcategories_str}", subcategories_str)
     )
-    return f"""Please classify the following transaction:
-- Description: {description}
-- Amount: {formatted_amount}
-- Account Context: {account_type}
-"""
+
+def build_user_prompt(description: str, amount: float, account_type: str = "Checking") -> str:
+    template_path = PROMPTS_DIR / "user_prompt.txt"
+    template_content = template_path.read_text(encoding="utf-8")
+    
+    return (
+        template_content
+        .replace("{description}", description)
+        .replace("{amount}", str(amount))
+        .replace("{account_type}", account_type)
+    )

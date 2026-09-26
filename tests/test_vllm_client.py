@@ -17,7 +17,7 @@ def test_build_user_prompt_from_raw_csv_row():
     )
 
     assert "VISA DDA PUR AP 403629  SPOTIFY" in prompt
-    assert "-$21.31" in prompt
+    assert "-21.31" in prompt
 
 
 @pytest.mark.asyncio
