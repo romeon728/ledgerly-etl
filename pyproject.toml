@@ -1,30 +1,30 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=68.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ledgerly"
-version = "0.2.0"
-description = "Financial ETL and categorization pipeline powered by rules & vLLM."
-authors = [{ name = "Nick" }]
-requires-python = ">=3.11"
+version = "2.0.0"
+description = "100% local financial ETL pipeline powered by local vLLM and Streamlit"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
 dependencies = [
+    "streamlit>=1.38.0",
+    "pandas>=2.0.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "psycopg2-binary>=2.9.0",
-    "pandas>=2.0.0",
-    "streamlit>=1.30.0",
-    "python-dotenv>=1.0.0",
-    "httpx>=0.25.0",            # For async calls to remote vLLM endpoint
-    "openai>=1.0.0",            # Standard client for vLLM API compatibility
+    "psycopg2-binary>=2.9.9",
+    "httpx>=0.25.0",
+    "openai>=1.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
-    "pytest-cov>=4.1.0",
-    "ruff>=0.2.0",
+    "pytest-asyncio>=0.23.0",
 ]
 
-[project.scripts]
-ledgerly = "ledgerly.app:main"
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ledgerly*"]
