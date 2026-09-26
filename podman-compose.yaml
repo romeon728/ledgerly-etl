@@ -1,0 +1,35 @@
+services:
+  db:
+    # Changed from postgres:16-alpine
+    image: docker.io/library/postgres:16-alpine
+    container_name: ledgerly-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-ledgerly_db}
+      POSTGRES_USER: ${DB_USER:-ledgerly}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-ledgerly_local_sec_pass}
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./scripts/db_setup.sql:/docker-entrypoint-initdb.d/init.sql
+      - ledgerly_pgdata:/var/lib/postgresql/data
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
+
+  app:
+    build: 
+      context: .
+      dockerfile: Containerfile
+    container_name: ledgerly-app
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    extra_hosts:
+      - "host.containers.internal:host-gateway"
+    depends_on:
+      - db
+
+volumes:
+  ledgerly_pgdata:
