@@ -1,19 +1,12 @@
-# Changed from python:3.12-slim
-FROM docker.io/library/python:3.12-slim
-
-# Install system dependencies for PostgreSQL driver
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy packaging details & source code
-COPY pyproject.toml .
-COPY src/ src/
+# Copy project definition and source code
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
 
-# Install application dependencies directly from pyproject.toml
+# Install application and dependencies in a single step
 RUN pip install --no-cache-dir .
 
 EXPOSE 8501

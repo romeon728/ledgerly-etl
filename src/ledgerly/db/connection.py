@@ -3,12 +3,16 @@ from contextlib import contextmanager
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
+from ledgerly.config import settings
+
 
 def get_db_url() -> str:
     """Constructs or retrieves the database connection string."""
-    return os.getenv(
-        "DATABASE_URL",
-        "postgresql://ledgerly:ledgerly_local_sec_pass@localhost:5433/ledgerly_db",
+    if os.getenv("DATABASE_URL"):
+        return os.getenv("DATABASE_URL")
+    return (
+        f"postgresql://{settings.db_user}:{settings.db_password}"
+        f"@{settings.db_host}:{settings.db_port}/{settings.db_name}"
     )
 
 
