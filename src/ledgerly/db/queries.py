@@ -76,8 +76,8 @@ def insert_transaction(txn: TransactionCreate) -> Optional[int]:
 def get_all_transactions() -> List[Tuple]:
     """Retrieves all stored transactions for verification."""
     query = """
-        SELECT transaction_id, bank_name, account_type, posted_date, 
-               t.description, amount, merchant, category, subcategory, source
+        SELECT bank_name, account_type, posted_date, 
+               t.description, amount, merchant, category, subcategory
         FROM transactions t
         JOIN accounts a ON t.account_id = a.account_id
         ORDER BY posted_date DESC;
@@ -85,3 +85,54 @@ def get_all_transactions() -> List[Tuple]:
     with get_db_cursor(commit=False) as cur:
         cur.execute(query)
         return cur.fetchall()
+
+def insert_transactions_batch(txn_schemas: list[TransactionCreate]) -> list[int]:
+    """Inserts a batch of transactions inside a single atomic transaction.
+    
+    Duplicates violating unique constraints are gracefully skipped.
+    """
+    if not txn_schemas:
+        return []
+
+    inserted_ids = []
+    with get_db_cursor(commit=True) as cur:
+        for txn in txn_schemas:
+            cur.execute(
+                """
+                INSERT INTO transactions (
+                    account_id, posted_date, description, amount, merchant, category, subcategory, source
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (account_id, posted_date, amount, description) DO NOTHING
+                RETURNING transaction_id;
+                """,
+                (
+                    txn.account_id,
+                    txn.posted_date,
+                    txn.description,
+                    txn.amount,
+                    txn.merchant,
+                    txn.category,
+                    txn.subcategory,
+                    txn.source,
+                ),
+            )
+            res = cur.fetchone()
+            if res:
+                inserted_ids.append(res[0])
+
+    return inserted_ids
+
+def delete_transactions_by_ids(txn_ids: list[int]) -> int:
+    """Deletes a list of transaction IDs from the database (used for rollback/undo)."""
+    if not txn_ids:
+        return 0
+
+    with get_db_cursor(commit=True) as cur:
+        cur.execute(
+            "DELETE FROM transactions WHERE transaction_id = ANY(%s);",
+            (txn_ids,),
+        )
+        deleted_count = cur.rowcount
+
+    return deleted_count

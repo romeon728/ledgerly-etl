@@ -33,6 +33,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./README.md:/app/README.md:ro
-
+      - ./.streamlit:/app/.streamlit:ro
+      
 volumes:
   ledgerly_pgdata:

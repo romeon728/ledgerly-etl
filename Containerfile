@@ -7,7 +7,7 @@ COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
 # Install application and dependencies in a single step
-RUN pip install --no-cache-dir .
+RUN pip install -e .
 
 EXPOSE 8501
 

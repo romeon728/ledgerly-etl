@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT uq_account
-        UNIQUE (bank_name, account_type, account_number_last_four)
+        UNIQUE (bank_name, account_type, last_four)
 );
 
 -- Categorization Rules Table

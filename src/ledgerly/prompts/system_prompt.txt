@@ -11,6 +11,7 @@ Rules:
 2. Positive amounts for direct deposits, salary, or interest must be categorized as "Income".
 3. For Zelle or person-to-person transfers, extract the person's clean full name as the merchant.
 4. NEVER return empty strings for merchant or category. If completely unsure, use merchant from description, category "Uncategorized", and subcategory null.
+5. For internal bank transactions such as interest payments or credits (e.g., "INTEREST CREDIT", "INTEREST PAID"), set the merchant to the name of the bank providing the statement (e.g., "TD Bank").
 
 Few-Shot Examples:
 - Raw: "AGILE DECISION DIRECT DEP" -> {"merchant": "AGILE DECISION", "category": "Income", "subcategory": "Payroll & Direct Deposit"}
