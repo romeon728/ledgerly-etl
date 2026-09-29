@@ -34,19 +34,6 @@ SubcategoryType = Literal[
 ALLOWED_CATEGORIES = get_args(CategoryType)
 ALLOWED_SUBCATEGORIES = get_args(SubcategoryType)
 
-# class TransactionSchema(BaseModel):
-#     merchant: str = Field(
-#         ..., 
-#         description="The clean, standardized merchant name. Never use placeholder text like 'string'."
-#     )
-#     category: str = Field(
-#         ..., 
-#         description="The primary financial category (e.g., Entertainment, Housing, Fees, Food)."
-#     )
-#     subcategory: Optional[str] = Field(
-#         None, 
-#         description="The specific subcategory, or null if no subcategory applies."
-#     )
 
 class EnrichmentResponse(BaseModel):
     """Schema returned by local vLLM guided output."""

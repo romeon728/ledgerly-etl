@@ -1,7 +1,7 @@
 import streamlit as st
 import asyncio
 from ledgerly.pipeline.runner import ETLRunner
-from ledgerly.views import upload, transactions, dashboard, about
+from ledgerly.views import upload, transactions, rules, dashboard, about
 
 st.set_page_config(page_title="Ledgerly", page_icon="💸", layout="wide")
 st.title("💸 Ledgerly")
@@ -12,9 +12,10 @@ def get_etl_runner():
 
 runner = get_etl_runner()
 
-tab_upload, tab_transactions, tab_dashboard, tab_about = st.tabs([
+tab_upload, tab_transactions, tab_rules, tab_dashboard, tab_about = st.tabs([
     "📤 Process & Upload", 
     "📂 Transactions", 
+    "📜 Rules",
     "📊 Dashboard", 
     "💡 About"
 ])
@@ -24,6 +25,9 @@ with tab_upload:
 
 with tab_transactions:
     transactions.render()
+
+with tab_rules:
+    rules.render()
 
 with tab_dashboard:
     dashboard.render()
