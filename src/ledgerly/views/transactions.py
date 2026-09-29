@@ -194,7 +194,8 @@ def render():
     # ------------------------------------------------------------------
     st.markdown("---")
 
-    col_kpi, col_toggle = st.columns([3, 1])
+    # Top row: Toggle aligned top-right above metrics
+    _, col_toggle = st.columns([3, 1])
     with col_toggle:
         exclude_transfers = st.checkbox(
             "🚫 Exclude Transfers",
@@ -202,35 +203,38 @@ def render():
             help="Excludes internal account transfers and credit card payments from Income and Expense totals.",
         )
 
-    # Filter dataset for KPI calculation if transfer exclusion is active
+    # Filter dataset for KPI calculation
     kpi_df = filtered_df.copy()
 
-    if exclude_transfers and "category" in kpi_df.columns:
-        transfer_categories = [
-            "Financial & Transfers",
-            "Account Transfer",
-            "Credit Card Payment",
-            "Transfer",
-        ]
-        kpi_df = kpi_df[
-            ~kpi_df["category"].astype(str).str.title().isin(transfer_categories)
-        ]
+    if exclude_transfers and "category" in kpi_df.columns and "subcategory" in kpi_df.columns:
+        # Require BOTH Category = 'Financial & Transfers' AND Subcategory in target list
+        is_transfer = (
+            kpi_df["category"].astype(str).str.lower() == "financial & transfers"
+        ) & (
+            kpi_df["subcategory"].astype(str).str.lower().isin(["account transfer"])
+        )
+        
+        kpi_df = kpi_df[~is_transfer]
 
-    total_txns = len(filtered_df)
-    net_total = (
-        filtered_df["amount"].sum() if "amount" in filtered_df.columns else 0.0
-    )
+    total_txns = len(kpi_df)
 
+    if "amount" in kpi_df.columns and not kpi_df.empty:
+        # Strict sign-based cash flow split on filtered dataset
+        income = kpi_df[kpi_df["amount"] > 0]["amount"].sum()
+        expenses = kpi_df[kpi_df["amount"] < 0]["amount"].sum()  # Negative value
+        net_total = income + expenses
+    else:
+        income = 0.0
+        expenses = 0.0
+        net_total = 0.0
+
+    # Full-width KPI cards rendered below the toggle row
     m1, m2, m3, m4 = st.columns(4)
 
     m1.metric("Total Transactions", f"{total_txns:,}")
     m2.metric("Net Total Amount", f"${net_total:,.2f}")
-
-    if "amount" in kpi_df.columns:
-        income = kpi_df[kpi_df["amount"] > 0]["amount"].sum()
-        expenses = kpi_df[kpi_df["amount"] < 0]["amount"].sum()
-        m3.metric("Total Income", f"${income:,.2f}")
-        m4.metric("Total Expenses", f"${abs(expenses):,.2f}")
+    m3.metric("Total Income", f"${income:,.2f}")
+    m4.metric("Total Expenses", f"${abs(expenses):,.2f}")
 
     # ------------------------------------------------------------------
     # 4. Formatted Data Table
