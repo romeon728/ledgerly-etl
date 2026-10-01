@@ -1,7 +1,9 @@
 import psycopg2
 import re
+import pandas as pd
+
 from psycopg2.extras import RealDictCursor
-from ledgerly.db.connection import get_db_connection
+from ledgerly.db.connection import get_db_connection, get_db_cursor
 
 
 def get_all_rules():
@@ -13,7 +15,7 @@ def get_all_rules():
                 SELECT id, pattern, match_type, target_merchant, 
                        target_category, target_subcategory, priority
                 FROM categorization_rules
-                ORDER BY priority DESC, id ASC;
+                ORDER BY target_category, target_subcategory, target_merchant, match_type
             """
             )
             return cur.fetchall()
@@ -209,6 +211,26 @@ def get_category_taxonomy() -> dict[str, list[str]]:
                 if subcat and subcat not in taxonomy[cat]:
                     taxonomy[cat].append(subcat)
     return taxonomy
+
+def get_rules_df() -> pd.DataFrame:
+    query = """
+        SELECT
+            id,
+            pattern,
+            match_type,
+            target_merchant,
+            target_category,
+            target_subcategory,
+            priority,
+            created_at
+        FROM categorization_rules
+        ORDER BY target_category DESC;
+    """
+    with get_db_cursor(commit=False) as cur:
+        cur.execute(query)
+        return pd.DataFrame(
+            cur.fetchall(), 
+            columns=[desc[0] for desc in cur.description])
 
 def delete_category_pair(category: str, subcategory: str | None = None) -> int:
     """Delete a specific subcategory pair or an entire category from PostgreSQL."""

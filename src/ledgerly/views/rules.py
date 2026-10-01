@@ -111,9 +111,8 @@ def render():
 
             for _, row in df_rules.iterrows():
                 rule_id = row["id"]
-                r_col1, r_col2, r_col3, r_col4, r_col5, r_col6, r_col7 = st.columns([0.8, 2.2, 1.8, 2.2, 1, 1.2, 1])
+                r_col1, r_col2, r_col3, r_col4, r_col5, r_col6, r_col7 = st.columns([0.3, 2.2, 1.8, 2.2, 1, 1.2, 1])
                 
-                r_col1.write(f"**#{rule_id}**")
                 r_col2.write(f"`{row['pattern']}` ({row['match_type']})")
                 r_col3.write(row["target_merchant"])
                 r_col4.write(f"{row['target_category']} > {row['target_subcategory'] or 'N/A'}")

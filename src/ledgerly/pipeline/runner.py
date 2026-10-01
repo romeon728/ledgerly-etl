@@ -1,3 +1,4 @@
+import re
 from typing import BinaryIO, Dict, Any, Optional, Callable
 import pandas as pd
 from ledgerly.extractors.csv_parser import CSVParser
@@ -7,11 +8,12 @@ from ledgerly.db.queries import (
     insert_transactions_batch,
     transaction_exists,
 )
+from ledgerly.db.rules import get_rules_df
 from ledgerly.db.models import TransactionCreate
 
 
 class ETLRunner:
-    """Orchestrates CSV parsing, deduplication, LLM enrichment, and PostgreSQL persistence."""
+    """Orchestrates CSV parsing, deduplication, rule evaluation, LLM enrichment, and PostgreSQL persistence."""
 
     def __init__(
         self,
@@ -20,6 +22,43 @@ class ETLRunner:
     ):
         self.parser = parser or CSVParser()
         self.enricher = enricher or TransactionEnricher()
+
+    def _match_rules(self, description: str, rules_df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """Evaluates description against loaded rules using contains, exact, or regex matching."""
+        if rules_df is None or rules_df.empty:
+            return None
+
+        desc_clean = description.strip()
+        desc_lower = desc_clean.lower()
+
+        for _, rule in rules_df.iterrows():
+            pattern = str(rule.get("pattern", "")).strip()
+            if not pattern:
+                continue
+
+            match_type = str(rule.get("match_type", "contains")).lower()
+            pattern_lower = pattern.lower()
+
+            is_match = False
+            if match_type == "exact":
+                is_match = (pattern_lower == desc_lower)
+            elif match_type == "contains":
+                is_match = (pattern_lower in desc_lower)
+            elif match_type == "regex":
+                try:
+                    is_match = bool(re.search(pattern, desc_clean, re.IGNORECASE))
+                except re.error:
+                    is_match = False
+
+            if is_match:
+                return {
+                    "merchant": rule.get("target_merchant"),
+                    "category": rule.get("target_category"),
+                    "subcategory": rule.get("target_subcategory"),
+                    "source": "rule_match",
+                }
+
+        return None
 
     async def run_pipeline(
         self,
@@ -39,6 +78,9 @@ class ETLRunner:
                 "inserted_ids": [],
             }
 
+        # Load active categorization rules once before looping rows
+        rules_df = get_rules_df()
+
         sample_last_four = (
             df["account_last_four"].iloc[0]
             if "account_last_four" in df.columns
@@ -52,7 +94,7 @@ class ETLRunner:
 
         skipped_count = 0
         txns_to_insert = []
-        seen_in_batch = set()  # <-- Track transactions processed within this batch
+        seen_in_batch = set()
         total_rows = len(df)
 
         for idx, (_, row) in enumerate(df.iterrows()):
@@ -66,9 +108,9 @@ class ETLRunner:
                 }
 
             posted_date = row["posted_date"]
-            description = row["description"]
+            description = str(row["description"])
             amount = float(row["amount"])
-            
+
             # Key to identify duplicate transactions within the same file
             batch_key = (posted_date, amount, description)
 
@@ -81,22 +123,28 @@ class ETLRunner:
 
             seen_in_batch.add(batch_key)
 
-            # 2. vLLM enrichment
-            enriched_data = await self.enricher.enrich(
-                description=description,
-                amount=amount,
-                account_type=account_type,
-            )
+            # Rule matching check
+            rule_match = self._match_rules(description, rules_df)
+
+            if rule_match:
+                enriched_data = rule_match
+            else:
+                # 2. vLLM enrichment (Fallback for rule misses)
+                enriched_data = await self.enricher.enrich(
+                    description=description,
+                    amount=amount,
+                    account_type=account_type,
+                )
 
             txn_schema = TransactionCreate(
                 account_id=account_id,
                 posted_date=posted_date,
                 description=description,
                 amount=amount,
-                merchant=enriched_data["merchant"],
-                category=enriched_data["category"],
-                subcategory=enriched_data["subcategory"],
-                source=enriched_data["source"],
+                merchant=enriched_data.get("merchant"),
+                category=enriched_data.get("category"),
+                subcategory=enriched_data.get("subcategory"),
+                source=enriched_data.get("source", "vllm"),
             )
 
             txns_to_insert.append(txn_schema)

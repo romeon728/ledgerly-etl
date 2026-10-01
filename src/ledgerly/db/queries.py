@@ -1,4 +1,6 @@
 from typing import Optional, Any, List, Tuple
+import pandas as pd
+
 from ledgerly.db.connection import get_db_cursor
 from ledgerly.db.models import TransactionCreate
 
@@ -86,6 +88,27 @@ def get_all_transactions() -> List[Tuple]:
         cur.execute(query)
         return cur.fetchall()
 
+def get_transactions_df() -> pd.DataFrame:
+    query = """
+        SELECT 
+            transaction_id,
+            account_id,
+            posted_date,
+            description,
+            amount,
+            merchant,
+            category,
+            subcategory,
+            source
+        FROM transactions
+        ORDER BY posted_date DESC;
+    """
+    with get_db_cursor(commit=False) as cur:
+        cur.execute(query)
+        return pd.DataFrame(
+            cur.fetchall(), 
+            columns=[desc[0] for desc in cur.description])
+    
 def insert_transactions_batch(txn_schemas: list[TransactionCreate]) -> list[int]:
     """Inserts a batch of transactions inside a single atomic transaction.
     
