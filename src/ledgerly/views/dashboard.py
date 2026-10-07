@@ -85,7 +85,7 @@ def render():
     # Helper column for monthly grouping
     filtered_df["month_str"] = filtered_df[date_col].dt.strftime("%Y-%m")
 
-    # Determine current / active ongoing months (system now, DB max date, or latest selected end date)
+    # Determine current / active ongoing months
     current_months = set()
     current_months.add(datetime.now().strftime("%Y-%m"))
     if max_db_date:
@@ -96,12 +96,10 @@ def render():
     valid_months = set()
 
     for month in filtered_df["month_str"].unique():
-        # Keep current/ongoing months regardless of partial date range
         if month in current_months:
             valid_months.add(month)
             continue
 
-        # For past months, ensure the full calendar month is selected
         try:
             m_year, m_month = map(int, month.split("-"))
             m_start_date = date(m_year, m_month, 1)
@@ -234,7 +232,13 @@ def render():
         inflows_df = filtered_df[filtered_df[amount_col] > 0].copy()
 
         # Direct exact subcategory match
-        is_payroll_subcat = inflows_df[subcat_col] == "Payroll & Direct Deposit"
+        is_payroll_subcat = inflows_df[subcat_col].str.strip().str.lower() == "payroll & direct deposit"
+
+        # Exclude internal account transfers from other income calculations
+        is_account_transfer = (
+            (inflows_df[category_col].str.strip().str.lower() == "financial & transfers")
+            & (inflows_df[subcat_col].str.strip().str.lower() == "account transfer")
+        )
 
         # Query database categorization rules dynamically
         try:
@@ -268,7 +272,7 @@ def render():
         is_payroll = is_payroll_subcat | is_payroll_rule
 
         payroll_df = inflows_df[is_payroll]
-        other_incomes_df = inflows_df[~is_payroll]
+        other_incomes_df = inflows_df[~is_payroll & ~is_account_transfer]
 
         ic1, ic2 = st.columns([1, 2])
         with ic1:
@@ -285,10 +289,30 @@ def render():
                     c for c in [date_col, merchant_col, desc_col, category_col, subcat_col, amount_col]
                     if c in other_incomes_df.columns
                 ]
+
+                column_rename_map = {
+                    date_col: "Date",
+                    merchant_col: "Merchant",
+                    desc_col: "Description",
+                    category_col: "Category",
+                    subcat_col: "Subcategory",
+                    amount_col: "Amount",
+                }
+
+                display_df = (
+                    other_incomes_df[cols_to_show]
+                    .sort_values(date_col, ascending=False)
+                    .rename(columns=column_rename_map)
+                )
+
                 st.dataframe(
-                    other_incomes_df[cols_to_show].sort_values(date_col, ascending=False),
+                    display_df,
                     use_container_width=True,
                     hide_index=True,
+                    column_config={
+                        "Date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
+                        "Amount": st.column_config.NumberColumn("Amount", format="$%.2f"),
+                    },
                 )
             else:
                 st.info("No other inflows found in selected date range.")

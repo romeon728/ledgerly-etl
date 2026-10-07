@@ -1,6 +1,5 @@
 services:
   db:
-    # Changed from postgres:16-alpine
     image: docker.io/library/postgres:16-alpine
     container_name: ledgerly-db
     restart: always
@@ -11,10 +10,15 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./scripts/db_setup.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/db_setup.sql:/docker-entrypoint-initdb.d/init.sql:Z
       - ledgerly_pgdata:/var/lib/postgresql/data
     extra_hosts:
       - "host.containers.internal:host-gateway"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ledgerly} -d ${DB_NAME:-ledgerly_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   app:
     build: 
@@ -29,11 +33,13 @@ services:
     extra_hosts:
       - "host.containers.internal:host-gateway"
     depends_on:
-      - db
+      db:
+        condition: service_healthy 
     volumes:
-      - ./src:/app/src
-      - ./README.md:/app/README.md:ro
-      - ./.streamlit:/app/.streamlit:ro
+      - ./src:/app/src:Z
+      - ./README.md:/app/README.md:ro,Z
+      - ./.streamlit:/app/.streamlit:ro,Z
+      - ./assets:/app/assets:ro
       
 volumes:
   ledgerly_pgdata:

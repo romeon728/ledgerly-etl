@@ -1,11 +1,17 @@
 import os
+import sys
 import subprocess
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load project root .env
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+# Route to the executable's real folder if packaged, otherwise use the script's folder
+if getattr(sys, 'frozen', False):
+    PROJECT_ROOT = Path(sys.executable).resolve().parent.parent
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+BACKUP_DIR = PROJECT_ROOT / "backups"
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env", override=True)
 
 BACKUP_DIR = PROJECT_ROOT / "backups"
@@ -53,7 +59,6 @@ def create_backup():
     cmd = [
         "podman",
         "exec",
-        "-t",
         container_name,
         "pg_dump",
         "-U",
