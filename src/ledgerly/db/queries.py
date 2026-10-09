@@ -1,3 +1,4 @@
+import hashlib
 from typing import Optional, Any, List, Tuple
 import pandas as pd
 
@@ -107,8 +108,24 @@ def get_transactions_df() -> pd.DataFrame:
         cur.execute(query)
         return pd.DataFrame(
             cur.fetchall(), 
-            columns=[desc[0] for desc in cur.description])
-    
+            columns=[desc[0] for desc in cur.description]
+        )
+
+
+def get_all_tx_hashes() -> List[str]:
+    """Retrieves SHA-256 hashes for all stored transactions to perform fast in-memory delta checks."""
+    query = "SELECT posted_date, amount, description FROM transactions;"
+    with get_db_cursor(commit=False) as cur:
+        cur.execute(query)
+        rows = cur.fetchall()
+
+    hashes = []
+    for posted_date, amount, description in rows:
+        raw_key = f"{posted_date}|{float(amount):.2f}|{str(description).strip().lower()}"
+        hashes.append(hashlib.sha256(raw_key.encode("utf-8")).hexdigest())
+
+    return hashes
+
 def insert_transactions_batch(txn_schemas: list[TransactionCreate]) -> list[int]:
     """Inserts a batch of transactions inside a single atomic transaction.
     
@@ -145,6 +162,27 @@ def insert_transactions_batch(txn_schemas: list[TransactionCreate]) -> list[int]
                 inserted_ids.append(res[0])
 
     return inserted_ids
+
+def insert_transactions_dataframe(df: pd.DataFrame, bank_name: str, account_type: str) -> list[int]:
+    """Converts user-reviewed DataFrame rows into TransactionCreate models and commits them via batch insert."""
+    if df.empty:
+        return []
+
+    txn_schemas = []
+    for _, row in df.iterrows():
+        txn = TransactionCreate(
+            account_id=int(row["account_id"]),
+            posted_date=row["posted_date"],
+            description=str(row["description"]),
+            amount=float(row["amount"]),
+            merchant=row.get("merchant"),
+            category=row.get("category"),
+            subcategory=row.get("subcategory"),
+            source=row.get("source", "user_staged"),
+        )
+        txn_schemas.append(txn)
+
+    return insert_transactions_batch(txn_schemas)
 
 def delete_transactions_by_ids(txn_ids: list[int]) -> int:
     """Deletes a list of transaction IDs from the database (used for rollback/undo)."""

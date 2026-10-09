@@ -40,6 +40,7 @@ services:
       - ./README.md:/app/README.md:ro,Z
       - ./.streamlit:/app/.streamlit:ro,Z
       - ./assets:/app/assets:ro
+      - ./data/imports:/app/data/imports
       
 volumes:
   ledgerly_pgdata:

@@ -75,7 +75,11 @@ def render():
         st.subheader("1. Ledger Report")
         uploaded_master = st.file_uploader(
             "Import existing Ledger Expense Report (.xlsx)",
-            type=["xlsx"],
+            type=[
+                "xlsx", 
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/vnd.ms-excel"
+            ],
             key="master_file_uploader",
             on_change=on_master_file_upload,
         )

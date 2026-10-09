@@ -1,12 +1,15 @@
+import hashlib
 import re
-from typing import BinaryIO, Dict, Any, Optional, Callable
+from typing import BinaryIO, Dict, Any, Optional, Callable, List, Tuple
 import pandas as pd
 from ledgerly.extractors.csv_parser import CSVParser
 from ledgerly.pipeline.enricher import TransactionEnricher
 from ledgerly.db.queries import (
     get_or_create_account,
-    insert_transactions_batch,
     transaction_exists,
+    get_all_tx_hashes,
+    insert_transactions_dataframe,
+    insert_transactions_batch,
 )
 from ledgerly.db.rules import get_rules_df
 from ledgerly.db.models import TransactionCreate
@@ -59,6 +62,110 @@ class ETLRunner:
                 }
 
         return None
+
+    def _generate_tx_hash(self, posted_date: Any, amount: float, description: str) -> str:
+        """Generates a deterministic hash string for transaction uniqueness comparison."""
+        raw_key = f"{posted_date}|{amount:.2f}|{description.strip().lower()}"
+        return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+    async def stage_pipeline(
+        self,
+        file_stream: BinaryIO,
+        bank_name: str,
+        account_type: str,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        cancel_check: Optional[Callable[[], bool]] = None,
+    ) -> Tuple[pd.DataFrame, set]:
+        """Parses, cleans, applies rules, and enriches data WITHOUT writing to PostgreSQL."""
+        df = self.parser.parse(file_stream)
+
+        if df.empty:
+            return pd.DataFrame(), set()
+
+        rules_df = get_rules_df()
+
+        sample_last_four = (
+            df["account_last_four"].iloc[0]
+            if "account_last_four" in df.columns
+            else "0000"
+        )
+        account_id = get_or_create_account(
+            bank_name=bank_name,
+            account_type=account_type,
+            last_four=str(sample_last_four),
+        )
+
+        # 1. Fetch existing hashes ONCE before looping
+        existing_hashes = set(get_all_tx_hashes())
+
+        staged_rows = []
+        seen_in_batch = set()
+        total_rows = len(df)
+
+        for idx, (_, row) in enumerate(df.iterrows()):
+            if cancel_check and cancel_check():
+                return pd.DataFrame(), set()
+
+            posted_date = row["posted_date"]
+            description = str(row["description"])
+            amount = float(row["amount"])
+
+            tx_hash = self._generate_tx_hash(posted_date, amount, description)
+
+            # 2. FAST-PATH: If already in DB or seen in this batch, skip rules & LLM completely!
+            if tx_hash in existing_hashes or tx_hash in seen_in_batch:
+                existing_hashes.add(tx_hash)
+                seen_in_batch.add(tx_hash)
+
+                staged_rows.append({
+                    "account_id": account_id,
+                    "posted_date": posted_date,
+                    "description": description,
+                    "amount": amount,
+                    "merchant": None,
+                    "category": "Existing Record",
+                    "subcategory": None,
+                    "source": "skipped_duplicate",
+                    "tx_hash": tx_hash,
+                })
+
+                if progress_callback:
+                    progress_callback(idx + 1, total_rows)
+                continue
+
+            seen_in_batch.add(tx_hash)
+
+            # 3. ONLY run rules / LLM enrichment on NEW transactions
+            rule_match = self._match_rules(description, rules_df)
+            if rule_match:
+                enriched_data = rule_match
+            else:
+                enriched_data = await self.enricher.enrich(
+                    description=description,
+                    amount=amount,
+                    account_type=account_type,
+                )
+
+            staged_rows.append({
+                "account_id": account_id,
+                "posted_date": posted_date,
+                "description": description,
+                "amount": amount,
+                "merchant": enriched_data.get("merchant"),
+                "category": enriched_data.get("category"),
+                "subcategory": enriched_data.get("subcategory"),
+                "source": enriched_data.get("source", "vllm"),
+                "tx_hash": tx_hash,
+            })
+
+            if progress_callback:
+                progress_callback(idx + 1, total_rows)
+
+        return pd.DataFrame(staged_rows), existing_hashes
+
+    def commit_dataframe(self, df: pd.DataFrame, bank_name: str, account_type: str) -> List[int]:
+        """Writes user-selected staging rows directly to PostgreSQL via insert_transactions_dataframe."""
+        return insert_transactions_dataframe(df, bank_name, account_type)
 
     async def run_pipeline(
         self,
