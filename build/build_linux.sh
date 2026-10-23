@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-echo "🔨 Building Ledgerly Standalone Ubuntu Executable..."
+echo "🔨 Building Ledgerly Standalone Linux Executable..."
 
-# Run PyInstaller with GTK hidden imports and collected assets
+# Ensure we are running from project root
+cd "$(dirname "$0")/.."
+
+# Run PyInstaller with Linux GUI integration flags
 pyinstaller --noconfirm --onefile --windowed \
     --hidden-import=gi \
     --collect-all=gi \
